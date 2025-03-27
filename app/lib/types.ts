@@ -41,6 +41,7 @@ export type WebhookPayload = {
   reminderId: string;
   tutorName: string;
   petName: string;
+  petBreed: string;
   phoneNumber: string;
   eventType: WebhookEventType;
   eventDescription: string;

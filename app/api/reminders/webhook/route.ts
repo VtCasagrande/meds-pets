@@ -70,6 +70,7 @@ export async function POST(request: NextRequest) {
       reminderId: reminder._id ? reminder._id.toString() : reminderId,
       tutorName: reminder.tutorName,
       petName: reminder.petName,
+      petBreed: reminder.petBreed || '',
       phoneNumber: reminder.phoneNumber,
       eventType: eventType as WebhookEventType,
       eventDescription: finalEventDescription,
@@ -80,8 +81,8 @@ export async function POST(request: NextRequest) {
         frequencyUnit: medicationProduct.frequencyUnit || 'horas',
         duration: medicationProduct.duration || 0,
         durationUnit: medicationProduct.durationUnit || 'dias',
-        startDateTime: medicationProduct.startDateTime ? medicationProduct.startDateTime.toISOString() : '',
-        endDateTime: medicationProduct.endDateTime ? medicationProduct.endDateTime.toISOString() : ''
+        startDateTime: medicationProduct.startDateTime ? new Date(medicationProduct.startDateTime).toISOString() : '',
+        endDateTime: medicationProduct.endDateTime ? new Date(medicationProduct.endDateTime).toISOString() : ''
       }
     };
     

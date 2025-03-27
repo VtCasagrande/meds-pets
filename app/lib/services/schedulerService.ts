@@ -110,6 +110,7 @@ async function executeTask(task: ScheduledTask) {
       reminderId: reminder.id || reminder._id || task.reminderId,
       tutorName: reminder.tutorName,
       petName: reminder.petName,
+      petBreed: reminder.petBreed || '',
       phoneNumber: reminder.phoneNumber,
       eventType: 'reminder_notification',
       eventDescription: `Hora do medicamento: ${medicationProduct.title}`,
@@ -196,7 +197,31 @@ async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
     await dbConnect();
     
     // Buscar lembrete
-    const reminder = await ReminderModel.findById(reminderId);
+    const reminderDoc = await ReminderModel.findById(reminderId);
+    
+    // Se não encontrou o lembrete, retornar null
+    if (!reminderDoc) {
+      return null;
+    }
+    
+    // Converter documento do MongoDB para o tipo Reminder
+    const reminder: Reminder = {
+      id: reminderDoc._id.toString(),
+      _id: reminderDoc._id.toString(),
+      tutorName: reminderDoc.tutorName,
+      petName: reminderDoc.petName,
+      petBreed: reminderDoc.petBreed || '',
+      phoneNumber: reminderDoc.phoneNumber,
+      isActive: reminderDoc.isActive,
+      medicationProducts: reminderDoc.medicationProducts.map(product => ({
+        ...product.toObject(),
+        startDateTime: product.startDateTime ? product.startDateTime.toISOString() : '',
+        endDateTime: product.endDateTime ? product.endDateTime.toISOString() : ''
+      })),
+      createdAt: reminderDoc.createdAt,
+      updatedAt: reminderDoc.updatedAt
+    };
+    
     return reminder;
   } catch (error) {
     console.error(`Erro ao buscar lembrete ${reminderId}:`, error);
