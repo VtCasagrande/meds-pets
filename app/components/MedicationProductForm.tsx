@@ -11,47 +11,66 @@ interface MedicationProductFormProps {
 
 // Função para calcular a data de término com base na duração
 function calculateEndDate(startDate: string, duration: number, durationUnit: string): string {
-  // Criar uma data base a partir da data de início
+  console.log('Calculando data de término para:', startDate, duration, durationUnit);
+  
+  // Converter a string de data para um objeto Date
+  // Ao usar o formato 'YYYY-MM-DDTHH:MM', o JavaScript assume UTC
+  // Então vamos garantir que o fuso horário local seja respeitado
+  
+  // Primeiro, converta a string para um objeto Date
   const startDateObj = new Date(startDate);
-  console.log(`Data de início: ${startDateObj.toISOString()}`);
-  console.log(`Duração: ${duration} ${durationUnit}`);
+  console.log('Data de início (objeto):', startDateObj);
+  console.log('Data de início (ISO):', startDateObj.toISOString());
+  console.log('Data local:', startDateObj.toString());
   
-  // Calcular o timestamp final baseado na duração
-  let endTimestamp = startDateObj.getTime(); // Timestamp em milissegundos
+  // Extrair os componentes da data manualmente
+  const year = startDateObj.getFullYear();
+  const month = startDateObj.getMonth();
+  const day = startDateObj.getDate();
+  const hours = startDateObj.getHours();
+  const minutes = startDateObj.getMinutes();
+  const seconds = startDateObj.getSeconds();
   
-  const MS_PER_DAY = 24 * 60 * 60 * 1000; // Milissegundos em um dia
+  console.log(`Componentes: ${year}-${month+1}-${day} ${hours}:${minutes}:${seconds}`);
   
+  // Criar um novo objeto date mantendo exatamente os mesmos componentes
+  let endYear = year;
+  let endMonth = month;
+  let endDay = day;
+  let endHours = hours;
+  let endMinutes = minutes;
+  
+  // Aplicar a duração com base na unidade
   switch(durationUnit) {
-    case 'dias':
-      endTimestamp += duration * MS_PER_DAY;
-      break;
-    case 'semanas':
-      endTimestamp += duration * 7 * MS_PER_DAY;
-      break;
-    case 'meses':
-      // Para meses, ainda usamos o método setMonth pois é difícil definir um mês exato em milissegundos
-      const monthDate = new Date(startDateObj.getTime());
-      monthDate.setMonth(monthDate.getMonth() + duration);
-      endTimestamp = monthDate.getTime();
+    case 'minutos':
+      endMinutes += duration;
       break;
     case 'horas':
-      endTimestamp += duration * 60 * 60 * 1000;
+      endHours += duration;
       break;
-    case 'minutos':
-      endTimestamp += duration * 60 * 1000;
+    case 'dias':
+      endDay += duration;
+      break;
+    case 'semanas':
+      endDay += duration * 7;
+      break;
+    case 'meses':
+      endMonth += duration;
       break;
   }
   
-  // Criar objeto de data final a partir do timestamp calculado
-  const endDateObj = new Date(endTimestamp);
-  console.log(`Data de término calculada: ${endDateObj.toISOString()}`);
+  // Criar o objeto Date final usando todos os componentes
+  const endDateObj = new Date(endYear, endMonth, endDay, endHours, endMinutes, seconds);
   
-  // Verificar se as horas foram preservadas corretamente
-  console.log(`Hora início: ${startDateObj.getHours()}:${startDateObj.getMinutes()}`);
-  console.log(`Hora término: ${endDateObj.getHours()}:${endDateObj.getMinutes()}`);
+  console.log('Data final calculada (objeto):', endDateObj);
+  console.log('Data final (ISO):', endDateObj.toISOString());
+  console.log('Data final (local):', endDateObj.toString());
   
-  // Retornar no formato para datetime-local
-  return endDateObj.toISOString().slice(0, 16);
+  // Extrair o ano, mês, dia, hora e minuto da data final
+  const endDateString = endDateObj.toISOString().slice(0, 16);
+  console.log('String formatada final:', endDateString);
+  
+  return endDateString;
 }
 
 export default function MedicationProductForm({

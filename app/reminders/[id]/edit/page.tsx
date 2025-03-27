@@ -72,47 +72,57 @@ export default function EditReminderPage({ params }: { params: { id: string } })
           // Calcular data de término se não existir
           let endDateTime = product.endDateTime ? new Date(product.endDateTime).toISOString().slice(0, 16) : '';
           if (!endDateTime && startDateTime) {
-            // Data original como objeto Date
+            // Converter a string de data para um objeto Date
+            // Garantindo que a hora seja preservada exatamente
             const startDateObj = new Date(startDateTime);
-            console.log(`Data de início: ${startDateObj.toISOString()}`);
-            console.log(`Duração: ${duration} ${durationUnit}`);
+            console.log('Data de início original:', startDateTime);
+            console.log('Data de início como objeto:', startDateObj.toString());
             
-            // Calcular o timestamp final baseado na duração
-            let endTimestamp = startDateObj.getTime(); // Timestamp em milissegundos
+            // Extrair os componentes da data manualmente
+            const year = startDateObj.getFullYear();
+            const month = startDateObj.getMonth();
+            const day = startDateObj.getDate();
+            const hours = startDateObj.getHours();
+            const minutes = startDateObj.getMinutes();
+            const seconds = startDateObj.getSeconds();
             
-            const MS_PER_DAY = 24 * 60 * 60 * 1000; // Milissegundos em um dia
+            console.log(`Componentes extraídos: ${year}-${month+1}-${day} ${hours}:${minutes}:${seconds}`);
             
+            // Criar um novo objeto date mantendo exatamente os mesmos componentes
+            let endYear = year;
+            let endMonth = month;
+            let endDay = day;
+            let endHours = hours;
+            let endMinutes = minutes;
+            
+            // Aplicar a duração com base na unidade escolhida
             switch(durationUnit) {
-              case 'dias':
-                endTimestamp += duration * MS_PER_DAY;
-                break;
-              case 'semanas':
-                endTimestamp += duration * 7 * MS_PER_DAY;
-                break;
-              case 'meses':
-                // Para meses, ainda usamos o método setMonth pois é difícil definir um mês exato em milissegundos
-                const monthDate = new Date(startDateObj.getTime());
-                monthDate.setMonth(monthDate.getMonth() + duration);
-                endTimestamp = monthDate.getTime();
+              case 'minutos':
+                endMinutes += duration;
                 break;
               case 'horas':
-                endTimestamp += duration * 60 * 60 * 1000;
+                endHours += duration;
                 break;
-              case 'minutos':
-                endTimestamp += duration * 60 * 1000;
+              case 'dias':
+                endDay += duration;
+                break;
+              case 'semanas':
+                endDay += duration * 7;
+                break;
+              case 'meses':
+                endMonth += duration;
                 break;
             }
             
-            // Criar objeto de data final a partir do timestamp calculado
-            const endDateObj = new Date(endTimestamp);
-            console.log(`Data de término calculada: ${endDateObj.toISOString()}`);
+            // Criar o objeto Date final com todos os componentes ajustados
+            const endDateObj = new Date(endYear, endMonth, endDay, endHours, endMinutes, seconds);
             
-            // Verificar se as horas foram preservadas corretamente
-            console.log(`Hora início: ${startDateObj.getHours()}:${startDateObj.getMinutes()}`);
-            console.log(`Hora término: ${endDateObj.getHours()}:${endDateObj.getMinutes()}`);
+            console.log('Data final como objeto:', endDateObj.toString());
+            console.log('Data final ISO:', endDateObj.toISOString());
             
-            // Formatar para datetime-local
+            // Formatar para o formato datetime-local
             endDateTime = endDateObj.toISOString().slice(0, 16);
+            console.log('String formatada final:', endDateTime);
           }
           
           // Construir o objeto de produto atualizado
