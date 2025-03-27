@@ -13,16 +13,16 @@ interface MedicationProductFormProps {
 function calculateEndDate(
   startDate: string, 
   duration: number, 
-  durationUnit: string
+  durationUnit: string,
+  frequencyValue: number,
+  frequencyUnit: string
 ): string {
-  console.log('Calculando data de término para:', startDate, duration, durationUnit);
+  console.log('Calculando data de término para:', startDate, duration, durationUnit, frequencyValue, frequencyUnit);
   
   // Converter a string de data para um objeto Date
   const startDateObj = new Date(startDate);
-  console.log('Data de início (objeto):', startDateObj);
-  console.log('Data de início (ISO):', startDateObj.toISOString());
-  console.log('Data local:', startDateObj.toString());
   
+  // Primeiro calculamos a data de término baseada apenas na duração
   // Extrair os componentes da data manualmente
   const year = startDateObj.getFullYear();
   const month = startDateObj.getMonth();
@@ -30,8 +30,6 @@ function calculateEndDate(
   const hours = startDateObj.getHours();
   const minutes = startDateObj.getMinutes();
   const seconds = startDateObj.getSeconds();
-  
-  console.log(`Componentes: ${year}-${month+1}-${day} ${hours}:${minutes}:${seconds}`);
   
   // Criar um novo objeto date mantendo exatamente os mesmos componentes
   let endYear = year;
@@ -59,31 +57,14 @@ function calculateEndDate(
       break;
   }
   
-  // Criar o objeto Date final usando todos os componentes
-  const endDateObj = new Date(endYear, endMonth, endDay, endHours, endMinutes, seconds);
+  // Criar o objeto Date final baseado apenas na duração
+  const durationEndDateObj = new Date(endYear, endMonth, endDay, endHours, endMinutes, seconds);
   
-  console.log('Data final calculada (objeto):', endDateObj);
-  console.log('Data final (ISO):', endDateObj.toISOString());
-  console.log('Data final (local):', endDateObj.toString());
-  
-  // Extrair o ano, mês, dia, hora e minuto da data final
-  const endDateString = endDateObj.toISOString().slice(0, 16);
-  console.log('String formatada final:', endDateString);
-  
-  return endDateString;
-}
-
-// Função para verificar se a última dose ficará fora do período de tratamento
-function checkLastDose(startDate: string, endDate: string, frequencyValue: number, frequencyUnit: string): { 
-  isLastDoseIncomplete: boolean, 
-  message: string,
-  lastDoseTime: Date
-} {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
+  // Agora vamos calcular a data final com base na frequência do medicamento
+  // (para garantir que termine após uma dose completa)
   
   // Calculando a duração total em milissegundos
-  const durationMs = end.getTime() - start.getTime();
+  const durationMs = durationEndDateObj.getTime() - startDateObj.getTime();
   
   // Convertendo a frequência para milissegundos
   let frequencyMs = 0;
@@ -103,19 +84,68 @@ function checkLastDose(startDate: string, endDate: string, frequencyValue: numbe
   const numberOfDoses = Math.floor(durationMs / frequencyMs);
   
   // Calculando quando seria a última dose completa
-  const lastDoseTime = new Date(start.getTime() + (numberOfDoses * frequencyMs));
+  const lastDoseTime = new Date(startDateObj.getTime() + (numberOfDoses * frequencyMs));
   
-  // Verificando se a última dose ficaria muito próxima do final do tratamento
-  // ou se o período termina logo após uma dose
-  const timeLeftPercentage = ((end.getTime() - lastDoseTime.getTime()) / frequencyMs) * 100;
-  const isLastDoseIncomplete = timeLeftPercentage < 90 && timeLeftPercentage > 5;
+  // Usar a data da última dose completa como data final
+  const finalEndDate = lastDoseTime;
   
-  let message = '';
-  if (isLastDoseIncomplete) {
-    message = `Atenção: A última dose ficará incompleta (${timeLeftPercentage.toFixed(0)}% do intervalo). A última dose completa será em ${lastDoseTime.toLocaleString('pt-BR')}.`;
+  console.log('Data final baseada na duração:', durationEndDateObj.toISOString());
+  console.log('Data final baseada nas doses completas:', finalEndDate.toISOString());
+  
+  // Extrair o ano, mês, dia, hora e minuto da data final
+  const endDateString = finalEndDate.toISOString().slice(0, 16);
+  console.log('String formatada final:', endDateString);
+  
+  return endDateString;
+}
+
+// Função para verificar se a última dose ficará fora do período de tratamento
+function checkLastDose(startDate: string, endDate: string, frequencyValue: number, frequencyUnit: string): { 
+  isLastDoseIncomplete: boolean, 
+  message: string,
+  lastDoseTime: Date
+} {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // A data final já é a última dose completa, então não há dose incompleta
+  // Mas vamos calcular a próxima dose (que seria incompleta) para informação
+  
+  // Convertendo a frequência para milissegundos
+  let frequencyMs = 0;
+  switch(frequencyUnit) {
+    case 'minutos':
+      frequencyMs = frequencyValue * 60 * 1000;
+      break;
+    case 'horas':
+      frequencyMs = frequencyValue * 60 * 60 * 1000;
+      break;
+    case 'dias':
+      frequencyMs = frequencyValue * 24 * 60 * 60 * 1000;
+      break;
   }
   
-  return { isLastDoseIncomplete, message, lastDoseTime };
+  // A próxima dose após a última dose completa
+  const nextDoseTime = new Date(end.getTime() + frequencyMs);
+  
+  // Calcular a data original de término se fosse baseada apenas na duração
+  // Esta é uma estimativa aproximada só para comparação
+  const roughEstimateEnd = new Date(end.getTime() + (frequencyMs * 0.3)); 
+  
+  // Verificar se haveria uma diferença significativa entre os métodos
+  const difference = Math.abs(roughEstimateEnd.getTime() - end.getTime());
+  const isSignificantDifference = difference > (frequencyMs * 0.1);
+  
+  let message = '';
+  if (isSignificantDifference) {
+    message = `Nota: A data final foi ajustada para coincidir com a última dose completa (${end.toLocaleString('pt-BR')}). A próxima dose seria em ${nextDoseTime.toLocaleString('pt-BR')}.`;
+  }
+  
+  return { 
+    isLastDoseIncomplete: false, // Nunca será incompleta com o novo método
+    message, 
+    lastDoseTime: end 
+  };
 }
 
 export default function MedicationProductForm({
@@ -173,7 +203,9 @@ export default function MedicationProductForm({
       const endDate = calculateEndDate(
         product.startDateTime, 
         product.duration, 
-        product.durationUnit
+        product.durationUnit,
+        product.frequencyValue,
+        product.frequencyUnit
       );
       
       console.log('Nova data de término calculada:', endDate);
@@ -248,32 +280,15 @@ export default function MedicationProductForm({
     const updatedEndDate = calculateEndDate(
       product.startDateTime, 
       product.duration, 
-      product.durationUnit
+      product.durationUnit,
+      product.frequencyValue,
+      product.frequencyUnit
     );
     
     const finalProduct = {
       ...product,
       endDateTime: updatedEndDate
     };
-    
-    // Recalcular a verificação da última dose
-    const lastDoseCheck = checkLastDose(
-      finalProduct.startDateTime,
-      finalProduct.endDateTime,
-      finalProduct.frequencyValue,
-      finalProduct.frequencyUnit
-    );
-    
-    // Se a última dose for incompleta, perguntar ao usuário se deseja continuar
-    if (lastDoseCheck.isLastDoseIncomplete) {
-      const confirmContinue = confirm(
-        `${lastDoseCheck.message}\n\nDeseja continuar mesmo assim ou ajustar a duração do tratamento?`
-      );
-      
-      if (!confirmContinue) {
-        return;
-      }
-    }
     
     console.log('Enviando medicamento:', finalProduct);
     onAdd(finalProduct);
@@ -439,8 +454,8 @@ export default function MedicationProductForm({
               })}
             </p>
           )}
-          {lastDoseInfo.isLastDoseIncomplete && (
-            <p className="text-sm text-amber-600 mt-1 font-medium border-l-2 border-amber-500 pl-2">
+          {lastDoseInfo.message && (
+            <p className="text-sm text-blue-600 mt-1 font-medium border-l-2 border-blue-500 pl-2">
               {lastDoseInfo.message}
             </p>
           )}
