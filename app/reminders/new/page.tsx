@@ -39,28 +39,46 @@ export default function NewReminderPage() {
 
     setError(null);
     
-    console.log('Adicionando medicamento:', product);
+    console.log('Adicionando medicamento ao lembrete:', product);
     
-    setReminder((prev) => {
-      if (editingProductIndex !== null) {
-        // Editando um produto existente
-        const updatedProducts = [...prev.medicationProducts];
-        updatedProducts[editingProductIndex] = product;
-        return {
-          ...prev,
-          medicationProducts: updatedProducts
-        };
-      } else {
-        // Adicionando um novo produto
-        return {
-          ...prev,
-          medicationProducts: [...prev.medicationProducts, product]
-        };
-      }
-    });
+    // Clone o produto para evitar referências compartilhadas
+    const productToAdd = { ...product };
     
-    setShowProductForm(false);
-    setEditingProductIndex(null);
+    try {
+      setReminder((prev) => {
+        console.log('Estado atual dos medicamentos:', prev.medicationProducts);
+        
+        let updatedReminder;
+        if (editingProductIndex !== null) {
+          // Editando um produto existente
+          const updatedProducts = [...prev.medicationProducts];
+          updatedProducts[editingProductIndex] = productToAdd;
+          updatedReminder = {
+            ...prev,
+            medicationProducts: updatedProducts
+          };
+        } else {
+          // Adicionando um novo produto
+          updatedReminder = {
+            ...prev,
+            medicationProducts: [...prev.medicationProducts, productToAdd]
+          };
+        }
+        
+        console.log('Novo estado dos medicamentos:', updatedReminder.medicationProducts);
+        return updatedReminder;
+      });
+      
+      // Feedback visual
+      alert('Medicamento adicionado com sucesso!');
+      
+      // Fechar formulário
+      setShowProductForm(false);
+      setEditingProductIndex(null);
+    } catch (err) {
+      console.error('Erro ao adicionar medicamento:', err);
+      setError('Erro ao adicionar medicamento. Tente novamente.');
+    }
   };
 
   const handleEditProduct = (index: number) => {

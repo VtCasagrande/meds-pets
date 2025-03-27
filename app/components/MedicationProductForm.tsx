@@ -40,6 +40,7 @@ export default function MedicationProductForm({
       return;
     }
     
+    console.log('Enviando medicamento:', product);
     onAdd(product);
     
     if (!initialData) {
@@ -58,7 +59,7 @@ export default function MedicationProductForm({
         {initialData ? 'Editar Medicamento' : 'Adicionar Medicamento'}
       </h3>
       
-      <form onSubmit={handleSubmit} method="dialog">
+      <div>
         <div className="mb-4">
           <label htmlFor="title" className="block text-sm font-medium text-gray-700">
             Nome do Medicamento
@@ -131,13 +132,14 @@ export default function MedicationProductForm({
             Cancelar
           </button>
           <button
-            type="submit"
+            type="button"
+            onClick={handleSubmit}
             className="btn-primary"
           >
             {initialData ? 'Atualizar' : 'Adicionar'}
           </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 } 
