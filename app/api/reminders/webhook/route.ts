@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
         frequencyUnit: medicationProduct.frequencyUnit || 'horas',
         duration: medicationProduct.duration || 0,
         durationUnit: medicationProduct.durationUnit || 'dias',
-        startDateTime: medicationProduct.startDateTime || '',
-        endDateTime: medicationProduct.endDateTime || ''
+        startDateTime: medicationProduct.startDateTime ? medicationProduct.startDateTime.toISOString() : '',
+        endDateTime: medicationProduct.endDateTime ? medicationProduct.endDateTime.toISOString() : ''
       }
     };
     
