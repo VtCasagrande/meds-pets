@@ -206,8 +206,8 @@ async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
     
     // Converter documento do MongoDB para o tipo Reminder
     const reminder: Reminder = {
-      id: reminderDoc._id.toString(),
-      _id: reminderDoc._id.toString(),
+      id: reminderDoc._id ? reminderDoc._id.toString() : reminderId,
+      _id: reminderDoc._id ? reminderDoc._id.toString() : reminderId,
       tutorName: reminderDoc.tutorName,
       petName: reminderDoc.petName,
       petBreed: reminderDoc.petBreed || '',
