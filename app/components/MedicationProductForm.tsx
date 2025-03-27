@@ -11,49 +11,47 @@ interface MedicationProductFormProps {
 
 // Função para calcular a data de término com base na duração
 function calculateEndDate(startDate: string, duration: number, durationUnit: string): string {
-  // Criar uma nova data a partir da data de início
-  const date = new Date(startDate);
-  const originalDate = new Date(startDate);
-  console.log('Data inicial para cálculo:', date.toISOString());
-  console.log('Duração:', duration, durationUnit);
+  // Criar uma data base a partir da data de início
+  const startDateObj = new Date(startDate);
+  console.log(`Data de início: ${startDateObj.toISOString()}`);
+  console.log(`Duração: ${duration} ${durationUnit}`);
   
-  // Obter os componentes da data e hora original
-  const originalHours = date.getHours();
-  const originalMinutes = date.getMinutes();
-  const originalSeconds = date.getSeconds();
+  // Calcular o timestamp final baseado na duração
+  let endTimestamp = startDateObj.getTime(); // Timestamp em milissegundos
   
-  // Verificar se há problemas com o timezone
-  console.log('Hora original:', originalHours, 'Minutos original:', originalMinutes);
+  const MS_PER_DAY = 24 * 60 * 60 * 1000; // Milissegundos em um dia
   
-  // Realizar o cálculo da data de término
   switch(durationUnit) {
     case 'dias':
-      // Usar o método set para calcular a data exata
-      const newDate = new Date(date.getTime());
-      newDate.setDate(date.getDate() + duration);
-      // Copiar a nova data
-      date.setTime(newDate.getTime());
-      console.log('Nova data após adicionar dias:', date.toISOString());
+      endTimestamp += duration * MS_PER_DAY;
       break;
     case 'semanas':
-      date.setDate(date.getDate() + (duration * 7));
+      endTimestamp += duration * 7 * MS_PER_DAY;
       break;
     case 'meses':
-      date.setMonth(date.getMonth() + duration);
+      // Para meses, ainda usamos o método setMonth pois é difícil definir um mês exato em milissegundos
+      const monthDate = new Date(startDateObj.getTime());
+      monthDate.setMonth(monthDate.getMonth() + duration);
+      endTimestamp = monthDate.getTime();
+      break;
+    case 'horas':
+      endTimestamp += duration * 60 * 60 * 1000;
+      break;
+    case 'minutos':
+      endTimestamp += duration * 60 * 1000;
       break;
   }
   
-  // Garantir que a hora seja mantida exatamente igual
-  date.setHours(originalHours);
-  date.setMinutes(originalMinutes);
-  date.setSeconds(originalSeconds);
+  // Criar objeto de data final a partir do timestamp calculado
+  const endDateObj = new Date(endTimestamp);
+  console.log(`Data de término calculada: ${endDateObj.toISOString()}`);
   
-  // Verificar se o horário foi mantido
-  console.log('Hora após ajuste:', date.getHours(), 'Minutos após ajuste:', date.getMinutes());
-  console.log('Data original:', originalDate.toISOString());
-  console.log('Data calculada após duração:', date.toISOString());
+  // Verificar se as horas foram preservadas corretamente
+  console.log(`Hora início: ${startDateObj.getHours()}:${startDateObj.getMinutes()}`);
+  console.log(`Hora término: ${endDateObj.getHours()}:${endDateObj.getMinutes()}`);
   
-  return date.toISOString().slice(0, 16); // Formato para datetime-local
+  // Retornar no formato para datetime-local
+  return endDateObj.toISOString().slice(0, 16);
 }
 
 export default function MedicationProductForm({

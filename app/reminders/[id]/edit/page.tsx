@@ -73,46 +73,46 @@ export default function EditReminderPage({ params }: { params: { id: string } })
           let endDateTime = product.endDateTime ? new Date(product.endDateTime).toISOString().slice(0, 16) : '';
           if (!endDateTime && startDateTime) {
             // Data original como objeto Date
-            const startDate = new Date(startDateTime);
-            console.log('Data inicial para cálculo (edit page):', startDate.toISOString());
-            console.log('Duração:', duration, durationUnit);
+            const startDateObj = new Date(startDateTime);
+            console.log(`Data de início: ${startDateObj.toISOString()}`);
+            console.log(`Duração: ${duration} ${durationUnit}`);
             
-            // Criar uma nova data para o cálculo
-            const endDate = new Date(startDate.getTime());
+            // Calcular o timestamp final baseado na duração
+            let endTimestamp = startDateObj.getTime(); // Timestamp em milissegundos
             
-            // Preservar a hora original com precisão
-            const originalHours = startDate.getHours();
-            const originalMinutes = startDate.getMinutes();
-            const originalSeconds = startDate.getSeconds();
+            const MS_PER_DAY = 24 * 60 * 60 * 1000; // Milissegundos em um dia
             
-            console.log('Hora original:', originalHours, 'Minutos original:', originalMinutes);
-            
-            // Realizar o cálculo baseado na duração
-            switch (durationUnit) {
+            switch(durationUnit) {
               case 'dias':
-                // Para 1 dia, calcular exatamente 24 horas depois
-                if (duration === 1) {
-                  endDate.setTime(startDate.getTime() + (24 * 60 * 60 * 1000));
-                } else {
-                  endDate.setDate(startDate.getDate() + duration);
-                }
+                endTimestamp += duration * MS_PER_DAY;
                 break;
               case 'semanas':
-                endDate.setDate(startDate.getDate() + (duration * 7));
+                endTimestamp += duration * 7 * MS_PER_DAY;
                 break;
               case 'meses':
-                endDate.setMonth(startDate.getMonth() + duration);
+                // Para meses, ainda usamos o método setMonth pois é difícil definir um mês exato em milissegundos
+                const monthDate = new Date(startDateObj.getTime());
+                monthDate.setMonth(monthDate.getMonth() + duration);
+                endTimestamp = monthDate.getTime();
+                break;
+              case 'horas':
+                endTimestamp += duration * 60 * 60 * 1000;
+                break;
+              case 'minutos':
+                endTimestamp += duration * 60 * 1000;
                 break;
             }
             
-            // Certificar-se de que a hora original seja mantida
-            endDate.setHours(originalHours);
-            endDate.setMinutes(originalMinutes);
-            endDate.setSeconds(originalSeconds);
+            // Criar objeto de data final a partir do timestamp calculado
+            const endDateObj = new Date(endTimestamp);
+            console.log(`Data de término calculada: ${endDateObj.toISOString()}`);
             
-            console.log('Hora calculada:', endDate.getHours(), 'Minutos calculados:', endDate.getMinutes());
-            console.log('Data final calculada (edit page):', endDate.toISOString());
-            endDateTime = endDate.toISOString().slice(0, 16);
+            // Verificar se as horas foram preservadas corretamente
+            console.log(`Hora início: ${startDateObj.getHours()}:${startDateObj.getMinutes()}`);
+            console.log(`Hora término: ${endDateObj.getHours()}:${endDateObj.getMinutes()}`);
+            
+            // Formatar para datetime-local
+            endDateTime = endDateObj.toISOString().slice(0, 16);
           }
           
           // Construir o objeto de produto atualizado
