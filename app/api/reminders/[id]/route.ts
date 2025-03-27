@@ -2,10 +2,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import Reminder from '@/app/lib/models/Reminder';
 import { WebhookPayload } from '@/app/lib/types';
-import { 
-  scheduleReminderNotifications, 
-  removeReminderNotifications 
-} from '@/app/lib/services/schedulerService';
+
+// Importar funções do schedulerService apenas em ambiente Node.js
+let scheduleReminderNotifications: (reminder: any, webhookUrl?: string, webhookSecret?: string) => Promise<void> = 
+  async () => { console.log('Ambiente não suportado para agendamento'); };
+let removeReminderNotifications: (reminderId: string) => void = 
+  () => { console.log('Ambiente não suportado para remover notificações'); };
+
+// Verificar se estamos em ambiente Node.js (não Edge)
+if (typeof window === 'undefined' && typeof process !== 'undefined' &&
+    process.env.NEXT_RUNTIME !== 'edge') {
+  // Importação dinâmica para evitar problemas no Edge Runtime
+  import('@/app/lib/services/schedulerService').then(module => {
+    scheduleReminderNotifications = module.scheduleReminderNotifications;
+    removeReminderNotifications = module.removeReminderNotifications;
+  }).catch(err => {
+    console.error('Erro ao importar serviço de agendamento:', err);
+  });
+}
 
 // Função auxiliar para enviar webhook
 async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhookSecret?: string) {

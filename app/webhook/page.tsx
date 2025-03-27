@@ -163,6 +163,34 @@ export default function WebhookConfigPage() {
     }
   };
   
+  // Iniciar o agendador manualmente
+  const startScheduler = async () => {
+    try {
+      setIsSaving(true);
+      setError(null);
+      
+      // Chamar a API para iniciar o agendador
+      const response = await fetch('/api/scheduler/start', {
+        method: 'POST'
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        console.log('Resultado do início do agendador:', result);
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        throw new Error(result.message || 'Erro ao iniciar o agendador');
+      }
+    } catch (error) {
+      console.error('Erro ao iniciar o agendador:', error);
+      setError('Erro ao iniciar o agendador. Verifique o console para mais detalhes.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
   return (
     <div>
       <div className="mb-6">
@@ -183,7 +211,7 @@ export default function WebhookConfigPage() {
       
       {saveSuccess && (
         <div className="bg-green-100 p-4 rounded-md text-green-800 mb-6">
-          <p>Configurações salvas com sucesso!</p>
+          <p>Operação realizada com sucesso!</p>
         </div>
       )}
       
@@ -224,21 +252,31 @@ export default function WebhookConfigPage() {
           </p>
         </div>
         
-        <button
-          onClick={saveWebhookConfig}
-          disabled={isSaving}
-          className="px-4 py-2 bg-blue-500 text-white font-medium rounded-md hover:bg-blue-600 disabled:opacity-50 mr-2"
-        >
-          {isSaving ? 'Salvando...' : 'Salvar Configurações'}
-        </button>
-        
-        <button
-          onClick={testWebhook}
-          disabled={isSaving || !webhookUrl}
-          className="px-4 py-2 bg-green-500 text-white font-medium rounded-md hover:bg-green-600 disabled:opacity-50"
-        >
-          Testar Webhook
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={saveWebhookConfig}
+            disabled={isSaving}
+            className="px-4 py-2 bg-blue-500 text-white font-medium rounded-md hover:bg-blue-600 disabled:opacity-50"
+          >
+            {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+          </button>
+          
+          <button
+            onClick={testWebhook}
+            disabled={isSaving || !webhookUrl}
+            className="px-4 py-2 bg-green-500 text-white font-medium rounded-md hover:bg-green-600 disabled:opacity-50"
+          >
+            Testar Webhook
+          </button>
+          
+          <button
+            onClick={startScheduler}
+            disabled={isSaving}
+            className="px-4 py-2 bg-purple-500 text-white font-medium rounded-md hover:bg-purple-600 disabled:opacity-50"
+          >
+            Iniciar Agendador
+          </button>
+        </div>
       </div>
       
       <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">

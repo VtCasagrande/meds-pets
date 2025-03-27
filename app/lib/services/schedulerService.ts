@@ -6,6 +6,10 @@ import { WebhookPayload } from '../types';
 // ou um sistema de agendamento como node-cron ou node-schedule.
 // Este é um protótipo simples apenas para demonstração.
 
+// Indicador de que estamos em ambiente Node.js (não Edge)
+const isNodeEnvironment = typeof window === 'undefined' && typeof process !== 'undefined' && 
+                          process.env.NEXT_RUNTIME !== 'edge';
+
 // Armazenamento em memória para tarefas agendadas
 // Na produção, isso seria armazenado em um banco de dados persistente
 interface ScheduledTask {
@@ -25,6 +29,12 @@ let schedulerInterval: NodeJS.Timeout | null = null;
 
 // Iniciar o agendador
 export function startScheduler() {
+  // Verificar se estamos em ambiente de servidor (não Edge)
+  if (!isNodeEnvironment) {
+    console.log('Agendador não iniciado: ambiente não suportado');
+    return;
+  }
+
   if (schedulerInterval) {
     return; // Já está rodando
   }
@@ -169,12 +179,20 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
 // Buscar um lembrete no banco de dados
 // Em um ambiente real, esta função usaria o mesmo modelo do MongoDB
 async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
+  if (!isNodeEnvironment) {
+    console.log('Ambiente não suportado para buscar lembrete');
+    return null;
+  }
+
   try {
-    // Importar modelo do Mongoose dinamicamente para evitar problemas de SSR
-    const { default: ReminderModel } = await import('../models/Reminder');
+    // Importar modelo do Mongoose dinamicamente para evitar problemas de SSR/Edge
+    const dbConnectPromise = import('../db').then(module => module.default);
+    const ReminderModelPromise = import('../models/Reminder').then(module => module.default);
+    
+    // Aguardar importações dinâmicas
+    const [dbConnect, ReminderModel] = await Promise.all([dbConnectPromise, ReminderModelPromise]);
     
     // Conectar ao banco de dados
-    const { default: dbConnect } = await import('../db');
     await dbConnect();
     
     // Buscar lembrete
@@ -192,6 +210,11 @@ export async function scheduleReminderNotifications(
   webhookUrl?: string, 
   webhookSecret?: string
 ) {
+  if (!isNodeEnvironment) {
+    console.log('Ambiente não suportado para agendamento de notificações');
+    return;
+  }
+
   if (!reminder.isActive) {
     console.log(`Lembrete ${reminder.id || reminder._id} não está ativo. Ignorando agendamento.`);
     return;
@@ -285,6 +308,11 @@ function scheduleNextNotification(
 
 // Remover todas as notificações agendadas para um lembrete
 export function removeReminderNotifications(reminderId: string) {
+  if (!isNodeEnvironment) {
+    console.log('Ambiente não suportado para remover notificações');
+    return;
+  }
+
   const tasksCount = scheduledTasks.length;
   
   scheduledTasks = scheduledTasks.filter(task => task.reminderId !== reminderId);
@@ -295,6 +323,11 @@ export function removeReminderNotifications(reminderId: string) {
 
 // Listar todas as tarefas agendadas (para depuração)
 export function listScheduledTasks() {
+  if (!isNodeEnvironment) {
+    console.log('Ambiente não suportado para listar tarefas');
+    return [];
+  }
+
   return scheduledTasks.map(task => ({
     id: task.id,
     reminderId: task.reminderId,
