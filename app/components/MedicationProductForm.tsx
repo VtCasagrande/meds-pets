@@ -73,6 +73,51 @@ function calculateEndDate(
   return endDateString;
 }
 
+// Função para verificar se a última dose ficará fora do período de tratamento
+function checkLastDose(startDate: string, endDate: string, frequencyValue: number, frequencyUnit: string): { 
+  isLastDoseIncomplete: boolean, 
+  message: string,
+  lastDoseTime: Date
+} {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  // Calculando a duração total em milissegundos
+  const durationMs = end.getTime() - start.getTime();
+  
+  // Convertendo a frequência para milissegundos
+  let frequencyMs = 0;
+  switch(frequencyUnit) {
+    case 'minutos':
+      frequencyMs = frequencyValue * 60 * 1000;
+      break;
+    case 'horas':
+      frequencyMs = frequencyValue * 60 * 60 * 1000;
+      break;
+    case 'dias':
+      frequencyMs = frequencyValue * 24 * 60 * 60 * 1000;
+      break;
+  }
+  
+  // Calculando o número de doses completas que cabem no período
+  const numberOfDoses = Math.floor(durationMs / frequencyMs);
+  
+  // Calculando quando seria a última dose completa
+  const lastDoseTime = new Date(start.getTime() + (numberOfDoses * frequencyMs));
+  
+  // Verificando se a última dose ficaria muito próxima do final do tratamento
+  // ou se o período termina logo após uma dose
+  const timeLeftPercentage = ((end.getTime() - lastDoseTime.getTime()) / frequencyMs) * 100;
+  const isLastDoseIncomplete = timeLeftPercentage < 90 && timeLeftPercentage > 5;
+  
+  let message = '';
+  if (isLastDoseIncomplete) {
+    message = `Atenção: A última dose ficará incompleta (${timeLeftPercentage.toFixed(0)}% do intervalo). A última dose completa será em ${lastDoseTime.toLocaleString('pt-BR')}.`;
+  }
+  
+  return { isLastDoseIncomplete, message, lastDoseTime };
+}
+
 export default function MedicationProductForm({
   onAdd,
   onCancel,
@@ -94,6 +139,16 @@ export default function MedicationProductForm({
   
   // Contador para forçar atualizações quando necessário
   const [forceUpdate, setForceUpdate] = useState(0);
+  
+  // Estado para armazenar informações sobre a última dose
+  const [lastDoseInfo, setLastDoseInfo] = useState<{
+    isLastDoseIncomplete: boolean;
+    message: string;
+    lastDoseTime?: Date;
+  }>({
+    isLastDoseIncomplete: false,
+    message: ''
+  });
   
   // Função para forçar recálculo da data final
   const forceRecalculation = () => {
@@ -135,6 +190,28 @@ export default function MedicationProductForm({
     const legacyFrequency = `A cada ${product.frequencyValue} ${product.frequencyUnit}`;
     setProduct(prev => ({ ...prev, frequency: legacyFrequency }));
   }, [product.frequencyValue, product.frequencyUnit]);
+  
+  // Verificar se a última dose ficará incompleta
+  useEffect(() => {
+    if (product.startDateTime && product.endDateTime && product.frequencyValue && product.frequencyUnit) {
+      console.log('Verificando última dose para:', {
+        start: product.startDateTime,
+        end: product.endDateTime,
+        frequencyValue: product.frequencyValue,
+        frequencyUnit: product.frequencyUnit
+      });
+      
+      const info = checkLastDose(
+        product.startDateTime,
+        product.endDateTime,
+        product.frequencyValue,
+        product.frequencyUnit
+      );
+      
+      console.log('Resultado da verificação da última dose:', info);
+      setLastDoseInfo(info);
+    }
+  }, [product.startDateTime, product.endDateTime, product.frequencyValue, product.frequencyUnit]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -178,6 +255,25 @@ export default function MedicationProductForm({
       ...product,
       endDateTime: updatedEndDate
     };
+    
+    // Recalcular a verificação da última dose
+    const lastDoseCheck = checkLastDose(
+      finalProduct.startDateTime,
+      finalProduct.endDateTime,
+      finalProduct.frequencyValue,
+      finalProduct.frequencyUnit
+    );
+    
+    // Se a última dose for incompleta, perguntar ao usuário se deseja continuar
+    if (lastDoseCheck.isLastDoseIncomplete) {
+      const confirmContinue = confirm(
+        `${lastDoseCheck.message}\n\nDeseja continuar mesmo assim ou ajustar a duração do tratamento?`
+      );
+      
+      if (!confirmContinue) {
+        return;
+      }
+    }
     
     console.log('Enviando medicamento:', finalProduct);
     onAdd(finalProduct);
@@ -341,6 +437,11 @@ export default function MedicationProductForm({
                 hour: '2-digit',
                 minute: '2-digit'
               })}
+            </p>
+          )}
+          {lastDoseInfo.isLastDoseIncomplete && (
+            <p className="text-sm text-amber-600 mt-1 font-medium border-l-2 border-amber-500 pl-2">
+              {lastDoseInfo.message}
             </p>
           )}
         </div>
