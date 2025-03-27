@@ -108,9 +108,6 @@ function checkLastDose(startDate: string, endDate: string, frequencyValue: numbe
   const start = new Date(startDate);
   const end = new Date(endDate);
   
-  // A data final já é a última dose completa, então não há dose incompleta
-  // Mas vamos calcular a próxima dose (que seria incompleta) para informação
-  
   // Convertendo a frequência para milissegundos
   let frequencyMs = 0;
   switch(frequencyUnit) {
@@ -128,21 +125,23 @@ function checkLastDose(startDate: string, endDate: string, frequencyValue: numbe
   // A próxima dose após a última dose completa
   const nextDoseTime = new Date(end.getTime() + frequencyMs);
   
-  // Calcular a data original de término se fosse baseada apenas na duração
-  // Esta é uma estimativa aproximada só para comparação
-  const roughEstimateEnd = new Date(end.getTime() + (frequencyMs * 0.3)); 
+  // Calcular quando seria a última dose baseada na frequência simples
+  // partindo da data inicial e verificando se coincide com a data final
+  const expectedDoses = Math.round((end.getTime() - start.getTime()) / frequencyMs);
+  const expectedEndTime = new Date(start.getTime() + (expectedDoses * frequencyMs));
   
-  // Verificar se haveria uma diferença significativa entre os métodos
-  const difference = Math.abs(roughEstimateEnd.getTime() - end.getTime());
-  const isSignificantDifference = difference > (frequencyMs * 0.1);
+  // Verificar se a data final é aproximadamente igual à data esperada
+  // (permitindo uma pequena margem para arredondamentos)
+  const difference = Math.abs(expectedEndTime.getTime() - end.getTime());
+  const isSignificantDifference = difference > (frequencyMs * 0.05);
   
   let message = '';
   if (isSignificantDifference) {
-    message = `Nota: A data final foi ajustada para coincidir com a última dose completa (${end.toLocaleString('pt-BR')}). A próxima dose seria em ${nextDoseTime.toLocaleString('pt-BR')}.`;
+    message = `Nota: A próxima dose seria em ${nextDoseTime.toLocaleString('pt-BR')}.`;
   }
   
   return { 
-    isLastDoseIncomplete: false, // Nunca será incompleta com o novo método
+    isLastDoseIncomplete: false,
     message, 
     lastDoseTime: end 
   };
