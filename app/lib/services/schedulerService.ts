@@ -121,8 +121,12 @@ async function executeTask(task: ScheduledTask) {
         frequencyUnit: medicationProduct.frequencyUnit || 'horas',
         duration: medicationProduct.duration || 0,
         durationUnit: medicationProduct.durationUnit || 'dias',
-        startDateTime: medicationProduct.startDateTime || '',
-        endDateTime: medicationProduct.endDateTime || ''
+        startDateTime: typeof medicationProduct.startDateTime === 'string' ? 
+          medicationProduct.startDateTime : 
+          (medicationProduct.startDateTime ? medicationProduct.startDateTime.toISOString() : ''),
+        endDateTime: typeof medicationProduct.endDateTime === 'string' ? 
+          medicationProduct.endDateTime : 
+          (medicationProduct.endDateTime ? medicationProduct.endDateTime.toISOString() : '')
       }
     };
     
@@ -227,7 +231,8 @@ async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
         }
         
         return {
-          id: product.id,
+          // O campo id pode não existir no modelo Mongoose
+          id: product._id ? product._id.toString() : undefined,
           title: product.title,
           quantity: product.quantity,
           frequency: product.frequency || '',
@@ -303,7 +308,11 @@ function scheduleNextNotification(
   } else {
     // Data no passado, calcular próxima ocorrência
     const frequencyValue = product.frequencyValue || 8;
-    const frequencyUnit = product.frequencyUnit || 'horas';
+    // Garantir que frequencyUnit seja um valor válido
+    let frequencyUnit: 'minutos' | 'horas' | 'dias' = 'horas';
+    if (product.frequencyUnit === 'minutos' || product.frequencyUnit === 'horas' || product.frequencyUnit === 'dias') {
+      frequencyUnit = product.frequencyUnit;
+    }
     
     // Calcular intervalo em milissegundos
     let intervalMs = 0;
