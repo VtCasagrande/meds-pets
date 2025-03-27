@@ -111,7 +111,9 @@ export default function NewReminderPage() {
         medicationProducts: reminder.medicationProducts.map(product => ({
           ...product,
           // Garantir que a data seja um objeto Date válido para o MongoDB
-          startDateTime: new Date(product.startDateTime).toISOString()
+          startDateTime: new Date(product.startDateTime).toISOString(),
+          // Incluir a data de término calculada
+          endDateTime: product.endDateTime ? new Date(product.endDateTime).toISOString() : undefined
         }))
       };
       

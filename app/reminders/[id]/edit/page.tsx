@@ -48,18 +48,57 @@ export default function EditReminderPage({ params }: { params: { id: string } })
       
       // Garantir que todos os produtos de medicamento tenham o formato correto
       if (data.medicationProducts) {
-        data.medicationProducts = data.medicationProducts.map((product: any) => ({
-          ...product,
-          // Converter objetos Date para strings ISO para o formulário
-          startDateTime: typeof product.startDateTime === 'string' 
-            ? product.startDateTime 
-            : new Date(product.startDateTime).toISOString().slice(0, 16),
-          endDateTime: product.endDateTime
-            ? (typeof product.endDateTime === 'string'
-                ? product.endDateTime
-                : new Date(product.endDateTime).toISOString().slice(0, 16))
-            : undefined
-        }));
+        data.medicationProducts = data.medicationProducts.map((product: any) => {
+          let startDateTime = '';
+          
+          // Verificar se startDateTime existe e formatá-lo corretamente
+          if (product.startDateTime) {
+            // Converter para objeto Date (seja de string ou objeto Date do MongoDB)
+            const startDate = new Date(product.startDateTime);
+            // Formatar para o formato datetime-local (YYYY-MM-DDTHH:MM)
+            startDateTime = startDate.toISOString().slice(0, 16);
+            console.log('Data formatada:', startDateTime);
+          } else {
+            // Se não houver data, usar data atual
+            startDateTime = new Date().toISOString().slice(0, 16);
+          }
+          
+          // Definir valores padrão para novos campos se não existirem
+          const frequencyValue = product.frequencyValue || 8;
+          const frequencyUnit = product.frequencyUnit || 'horas';
+          const duration = product.duration || 7;
+          const durationUnit = product.durationUnit || 'dias';
+          
+          // Calcular data de término se não existir
+          let endDateTime = product.endDateTime ? new Date(product.endDateTime).toISOString().slice(0, 16) : '';
+          if (!endDateTime && startDateTime) {
+            const endDate = new Date(startDateTime);
+            
+            // Calcular com base na duração
+            if (durationUnit === 'dias') {
+              endDate.setDate(endDate.getDate() + duration);
+            } else if (durationUnit === 'semanas') {
+              endDate.setDate(endDate.getDate() + (duration * 7));
+            } else if (durationUnit === 'meses') {
+              endDate.setMonth(endDate.getMonth() + duration);
+            }
+            
+            endDateTime = endDate.toISOString().slice(0, 16);
+          }
+          
+          // Construir o objeto de produto atualizado
+          return {
+            ...product,
+            startDateTime,
+            endDateTime,
+            frequencyValue,
+            frequencyUnit,
+            duration,
+            durationUnit,
+            // Garantir que o campo legado de frequência esteja atualizado
+            frequency: `A cada ${frequencyValue} ${frequencyUnit}`
+          };
+        });
       }
 
       setReminder(data);
@@ -155,13 +194,14 @@ export default function EditReminderPage({ params }: { params: { id: string } })
       setIsSubmitting(true);
       setError(null);
       
-      // Manter o status original do lembrete
+      // Formatar os medicamentos para envio
       const formattedReminder = {
         ...reminder,
         medicationProducts: reminder.medicationProducts.map(product => ({
           ...product,
           // Garantir que as datas estejam no formato correto para o MongoDB
-          startDateTime: new Date(product.startDateTime).toISOString()
+          startDateTime: new Date(product.startDateTime).toISOString(),
+          endDateTime: product.endDateTime ? new Date(product.endDateTime).toISOString() : undefined
         }))
       };
       
