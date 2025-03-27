@@ -110,6 +110,10 @@ export default function ReminderDetailsPage({ params }: { params: { id: string }
     }
   };
 
+  const handleEdit = () => {
+    router.push(`/reminders/${id}/edit`);
+  };
+
   if (isLoading) {
     return (
       <div className="text-center p-8">
@@ -155,6 +159,13 @@ export default function ReminderDetailsPage({ params }: { params: { id: string }
         <div className="flex justify-between items-center mt-2">
           <h2 className="text-2xl font-bold">Detalhes do Lembrete</h2>
           <div className="flex items-center space-x-3">
+            <button
+              onClick={handleEdit}
+              className="py-2 px-4 rounded-lg shadow-md text-white text-sm font-semibold bg-blue-500 hover:bg-blue-600"
+            >
+              Editar
+            </button>
+            
             <button
               onClick={handleToggleStatus}
               disabled={isTogglingStatus}
