@@ -28,6 +28,21 @@ if (!MONGODB_URI.startsWith('mongodb://') && !MONGODB_URI.startsWith('mongodb+sr
   );
 }
 
+// Extrair informações da URI para melhorar os logs
+const uriPattern = /mongodb(?:\+srv)?:\/\/([^:]+):([^@]+)@([^\/]+)\/([^\?]+)(\?.*)?/;
+const uriMatch = MONGODB_URI.match(uriPattern);
+
+if (uriMatch) {
+  const [, username, password, host, database, queryParams] = uriMatch;
+  console.log('Informações de conexão:', {
+    host,
+    database,
+    username,
+    passwordLength: password ? '***' : '0',
+    hasQueryParams: !!queryParams
+  });
+}
+
 // Como já verificamos que MONGODB_URI não é undefined acima, podemos definir uma constante para TypeScript
 const MONGODB_URI_VERIFIED: string = MONGODB_URI;
 
@@ -64,14 +79,17 @@ async function dbConnect() {
     const opts = {
       bufferCommands: false,
       // Adicionar retry e timeout
-      serverSelectionTimeoutMS: 20000, // Aumentado para 20s
-      socketTimeoutMS: 60000, // Aumentado para 60s
-      connectTimeoutMS: 20000, // Aumentado para 20s
+      serverSelectionTimeoutMS: 30000, // Aumentado para 30s
+      socketTimeoutMS: 60000, // 60s
+      connectTimeoutMS: 30000, // Aumentado para 30s
       // Aumentar retries
       maxPoolSize: 10,
       minPoolSize: 5,
       retryWrites: true,
-      retryReads: true
+      retryReads: true,
+      // Opções de autenticação
+      authSource: 'admin', // Banco de dados para autenticação (pode precisar ser ajustado)
+      authMechanism: 'DEFAULT', // Mecanismo de autenticação padrão
     };
 
     console.log('Iniciando nova conexão ao MongoDB...');
@@ -81,6 +99,22 @@ async function dbConnect() {
     const maskedUri = MONGODB_URI_VERIFIED.replace(/mongodb(\+srv)?:\/\/([^:]+):([^@]+)@/, 'mongodb$1://***:***@');
     console.log('URI do MongoDB (mascarada):', maskedUri);
     console.log('Tentando conectar com as seguintes opções:', JSON.stringify(opts, null, 2));
+
+    // Teste de conexão simples para verificar credenciais
+    try {
+      console.log('Testando conexão MongoDB com MongoClient...');
+      const { MongoClient } = require('mongodb');
+      const client = new MongoClient(MONGODB_URI_VERIFIED, opts);
+      await client.connect();
+      console.log('Teste de conexão bem-sucedido com MongoClient');
+      await client.close();
+      console.log('Conexão de teste fechada');
+    } catch (testError) {
+      console.error('Teste de conexão falhou:', testError);
+      if (testError.name === 'MongoServerError' && testError.code === 18) {
+        console.error('ERRO DE AUTENTICAÇÃO: Verifique as credenciais na string de conexão');
+      }
+    }
 
     cached.promise = mongoose.connect(MONGODB_URI_VERIFIED, opts)
       .then((mongoose) => {
@@ -109,6 +143,10 @@ async function dbConnect() {
             dnsHostname: error.dnsHostname,
             errorLabels: error.errorLabels
           });
+        }
+        if (error.name === 'MongoServerError' && error.code === 18) {
+          console.error('ERRO DE AUTENTICAÇÃO: Credenciais inválidas. Verifique usuário e senha na URI.');
+          console.error('Sugestão: Certifique-se de que o usuário tem acesso ao banco correto e que a string de conexão está formatada adequadamente.');
         }
         cached.promise = null;
         throw error;
