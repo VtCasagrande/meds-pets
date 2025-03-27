@@ -27,7 +27,15 @@ RUN npm run build
 
 # Imagem final de produção
 FROM base AS runner
+# Adicionar os argumentos para o estágio runner também
+ARG MONGODB_URI
+ARG NODE_ENV
+ARG NEXT_PUBLIC_BASE_URL
+
+# Configurar as variáveis de ambiente para runtime
 ENV NODE_ENV=production
+ENV MONGODB_URI=$MONGODB_URI
+ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
 
 # Adicionar usuário não-root
 RUN addgroup --system --gid 1001 nodejs
@@ -48,7 +56,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # Expor a porta
 EXPOSE 3000
 
-# Definir variáveis de ambiente
+# Definir variáveis de ambiente para a aplicação
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
