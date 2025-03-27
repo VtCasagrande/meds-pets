@@ -213,18 +213,32 @@ async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
       petBreed: reminderDoc.petBreed || '',
       phoneNumber: reminderDoc.phoneNumber,
       isActive: reminderDoc.isActive,
-      medicationProducts: reminderDoc.medicationProducts.map(product => ({
-        id: product.id,
-        title: product.title,
-        quantity: product.quantity,
-        frequency: product.frequency || '',
-        frequencyValue: product.frequencyValue || 0,
-        frequencyUnit: product.frequencyUnit || 'horas',
-        duration: product.duration || 0,
-        durationUnit: product.durationUnit || 'dias',
-        startDateTime: product.startDateTime ? product.startDateTime.toISOString() : '',
-        endDateTime: product.endDateTime ? product.endDateTime.toISOString() : ''
-      })),
+      medicationProducts: reminderDoc.medicationProducts.map(product => {
+        // Garantir que frequencyUnit seja um valor válido
+        let frequencyUnit: 'minutos' | 'horas' | 'dias' = 'horas';
+        if (product.frequencyUnit === 'minutos' || product.frequencyUnit === 'horas' || product.frequencyUnit === 'dias') {
+          frequencyUnit = product.frequencyUnit;
+        }
+        
+        // Garantir que durationUnit seja um valor válido
+        let durationUnit: 'dias' | 'semanas' | 'meses' = 'dias';
+        if (product.durationUnit === 'dias' || product.durationUnit === 'semanas' || product.durationUnit === 'meses') {
+          durationUnit = product.durationUnit;
+        }
+        
+        return {
+          id: product.id,
+          title: product.title,
+          quantity: product.quantity,
+          frequency: product.frequency || '',
+          frequencyValue: product.frequencyValue || 0,
+          frequencyUnit: frequencyUnit,
+          duration: product.duration || 0,
+          durationUnit: durationUnit,
+          startDateTime: product.startDateTime ? product.startDateTime.toISOString() : '',
+          endDateTime: product.endDateTime ? product.endDateTime.toISOString() : ''
+        };
+      }),
       createdAt: reminderDoc.createdAt,
       updatedAt: reminderDoc.updatedAt
     };
