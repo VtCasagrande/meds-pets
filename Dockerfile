@@ -16,7 +16,7 @@ RUN npm run build
 
 # Imagem final de produção
 FROM base AS runner
-ENV NODE_ENV production
+ENV NODE_ENV=production
 
 # Adicionar usuário não-root
 RUN addgroup --system --gid 1001 nodejs
@@ -32,8 +32,8 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 EXPOSE 3000
 
 # Definir variáveis de ambiente
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
 # Comando para iniciar a aplicação
 CMD ["node", "server.js"] 

@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     
     // Preparar payload do webhook
     const webhookPayload: WebhookPayload = {
-      reminderId: reminder._id.toString(),
+      reminderId: reminder._id ? reminder._id.toString() : reminderId,
       tutorName: reminder.tutorName,
       petName: reminder.petName,
       phoneNumber: reminder.phoneNumber,
