@@ -1,0 +1,23 @@
+# Arquivos e diretórios do Git
+.git
+.gitignore
+
+# Dependências e builds
+node_modules
+.next
+out
+
+# Arquivos de ambiente
+.env*
+
+# Arquivos de desenvolvimento
+README.md
+.eslintrc.json
+.prettier*
+*.log
+npm-debug.log*
+
+# Arquivos Docker
+Dockerfile
+docker-compose.yml
+.dockerignore 
