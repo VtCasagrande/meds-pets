@@ -35,11 +35,15 @@ export type RemindersState = {
 }
 
 // Tipos para webhooks
+export type WebhookEventType = 'reminder_created' | 'reminder_updated' | 'reminder_notification';
+
 export type WebhookPayload = {
   reminderId: string;
   tutorName: string;
   petName: string;
   phoneNumber: string;
+  eventType: WebhookEventType;
+  eventDescription: string;
   medicationProduct: {
     title: string;
     quantity: string;

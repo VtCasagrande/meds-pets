@@ -1,6 +1,52 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import Reminder from '@/app/lib/models/Reminder';
+import { WebhookPayload } from '@/app/lib/types';
+import { scheduleReminderNotifications } from '@/app/lib/services/schedulerService';
+
+// Função auxiliar para enviar webhook
+async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhookSecret?: string) {
+  // Se não temos URL, não enviamos webhook
+  if (!webhookUrl) {
+    console.log('Nenhuma URL de webhook configurada, pulando envio');
+    return null;
+  }
+  
+  try {
+    console.log(`Enviando webhook para URL: ${webhookUrl}`);
+    
+    // Configurar headers para incluir a chave secreta, se fornecida
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json'
+    };
+    
+    if (webhookSecret) {
+      headers['X-Webhook-Secret'] = webhookSecret;
+    }
+    
+    // Enviar o webhook para a URL configurada
+    const webhookResponse = await fetch(webhookUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload)
+    });
+    
+    const responseStatus = webhookResponse.status;
+    console.log(`Resposta do webhook: status ${responseStatus}`);
+    
+    try {
+      const responseData = await webhookResponse.json();
+      console.log('Dados da resposta:', responseData);
+      return responseData;
+    } catch (e) {
+      console.log('Não foi possível obter dados JSON da resposta');
+      return { status: responseStatus };
+    }
+  } catch (error) {
+    console.error('Erro ao enviar webhook:', error);
+    return null;
+  }
+}
 
 // GET /api/reminders - Listar todos os lembretes
 export async function GET() {
@@ -47,6 +93,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     console.log('Dados recebidos:', JSON.stringify(body, null, 2));
     
+    // Extrair a URL e chave secreta do webhook, se fornecidas
+    const { webhookUrl, webhookSecret } = body;
+    
     // Validação básica
     if (!body.tutorName || !body.petName || !body.phoneNumber || !body.medicationProducts || body.medicationProducts.length === 0) {
       console.error('Dados incompletos recebidos');
@@ -63,9 +112,10 @@ export async function POST(request: NextRequest) {
     
     // Verificar formato da data nos medicamentos
     try {
-      body.medicationProducts = body.medicationProducts.map((product: { startDateTime: string | Date }) => ({
+      body.medicationProducts = body.medicationProducts.map((product: { startDateTime: string | Date, endDateTime?: string | Date }) => ({
         ...product,
-        startDateTime: new Date(product.startDateTime)
+        startDateTime: new Date(product.startDateTime),
+        ...(product.endDateTime && { endDateTime: new Date(product.endDateTime) })
       }));
       console.log('Datas dos medicamentos convertidas com sucesso');
     } catch (dateError) {
@@ -79,16 +129,46 @@ export async function POST(request: NextRequest) {
     // Criar novo lembrete
     console.log('Criando novo lembrete...');
     try {
-      const reminder = new Reminder(body);
+      // Remover campos do webhook dos dados do lembrete
+      const reminderData = { ...body };
+      delete reminderData.webhookUrl;
+      delete reminderData.webhookSecret;
+      
+      const reminder = new Reminder(reminderData);
       await reminder.save();
       console.log('Lembrete criado com sucesso, ID:', reminder._id);
       
-      // Agendar webhooks para cada medicamento
-      for (const product of body.medicationProducts) {
-        // Aqui você pode incluir a lógica para agendar os webhooks
-        // Ou chamar um serviço externo para agendar as notificações
-        console.log(`Agendando webhook para medicamento ${product.title} em ${product.startDateTime}`);
+      // Enviar webhook para o primeiro medicamento (criação de lembrete)
+      if (reminder.medicationProducts.length > 0) {
+        const firstProduct = reminder.medicationProducts[0];
+        
+        // Preparar payload do webhook
+        const webhookPayload: WebhookPayload = {
+          reminderId: reminder._id.toString(),
+          tutorName: reminder.tutorName,
+          petName: reminder.petName,
+          phoneNumber: reminder.phoneNumber,
+          eventType: 'reminder_created',
+          eventDescription: 'Novo lembrete criado',
+          medicationProduct: {
+            title: firstProduct.title,
+            quantity: firstProduct.quantity,
+            frequencyValue: firstProduct.frequencyValue || 0,
+            frequencyUnit: firstProduct.frequencyUnit || 'horas',
+            duration: firstProduct.duration || 0,
+            durationUnit: firstProduct.durationUnit || 'dias',
+            startDateTime: firstProduct.startDateTime ? firstProduct.startDateTime.toISOString() : '',
+            endDateTime: firstProduct.endDateTime ? firstProduct.endDateTime.toISOString() : ''
+          }
+        };
+        
+        // Enviar webhook de criação
+        await sendWebhook(webhookPayload, webhookUrl, webhookSecret);
       }
+      
+      // Agendar notificações automáticas para cada medicamento
+      console.log('Agendando notificações automáticas...');
+      await scheduleReminderNotifications(reminder, webhookUrl, webhookSecret);
       
       return NextResponse.json(reminder, { status: 201 });
     } catch (dbError: any) {

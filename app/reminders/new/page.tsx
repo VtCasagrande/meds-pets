@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Reminder, MedicationProduct } from '@/app/lib/types';
 import MedicationProductForm from '@/app/components/MedicationProductForm';
@@ -13,6 +13,8 @@ export default function NewReminderPage() {
   const [error, setError] = useState<string | null>(null);
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProductIndex, setEditingProductIndex] = useState<number | null>(null);
+  const [webhookUrl, setWebhookUrl] = useState<string>('');
+  const [webhookSecret, setWebhookSecret] = useState<string>('');
   
   const [reminder, setReminder] = useState<Reminder>({
     tutorName: '',
@@ -22,6 +24,15 @@ export default function NewReminderPage() {
     medicationProducts: [],
     isActive: true
   });
+  
+  // Carregamento das configurações de webhook do localStorage
+  useEffect(() => {
+    // Carregar configurações do webhook
+    const savedUrl = localStorage.getItem('webhookUrl') || '';
+    const savedSecret = localStorage.getItem('webhookSecret') || '';
+    setWebhookUrl(savedUrl);
+    setWebhookSecret(savedSecret);
+  }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -123,7 +134,10 @@ export default function NewReminderPage() {
             startDateTime: startDateTime.toISOString(),
             endDateTime: endDateTime ? endDateTime.toISOString() : undefined
           };
-        })
+        }),
+        // Incluir configurações de webhook, se disponíveis
+        webhookUrl,
+        webhookSecret
       };
       
       console.log('Enviando dados:', JSON.stringify(formattedReminder, null, 2));

@@ -57,6 +57,9 @@ export default function WebhookConfigPage() {
       localStorage.setItem('webhookSecret', webhookSecret);
       setSaveSuccess(true);
       
+      // Atualizar todos os lembretes com a nova configuração de webhook
+      updateRemindersWithWebhook();
+      
       // Limpar mensagem de sucesso após alguns segundos
       setTimeout(() => {
         setSaveSuccess(false);
@@ -64,6 +67,97 @@ export default function WebhookConfigPage() {
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
       setError('Não foi possível salvar as configurações.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  // Atualizar todos os lembretes ativos com a configuração de webhook
+  const updateRemindersWithWebhook = async () => {
+    if (!webhookUrl) {
+      console.log('URL de webhook não configurada, ignorando atualização de lembretes');
+      return;
+    }
+    
+    try {
+      for (const reminder of reminders) {
+        console.log(`Atualizando lembrete ${reminder.id} com webhook...`);
+        
+        // Construir body com a configuração de webhook
+        const body = {
+          ...reminder,
+          webhookUrl,
+          webhookSecret
+        };
+        
+        // Atualizar lembrete via API
+        const response = await fetch(`/api/reminders/${reminder.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        });
+        
+        if (!response.ok) {
+          console.error(`Erro ao atualizar lembrete ${reminder.id}:`, await response.text());
+        } else {
+          console.log(`Lembrete ${reminder.id} atualizado com webhook.`);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao atualizar lembretes com webhook:', error);
+    }
+  };
+  
+  // Testar webhook enviando uma notificação de teste
+  const testWebhook = async () => {
+    if (!webhookUrl) {
+      setError('Configure uma URL de webhook antes de testar.');
+      return;
+    }
+    
+    if (reminders.length === 0) {
+      setError('Não há lembretes ativos para testar o webhook.');
+      return;
+    }
+    
+    try {
+      setIsSaving(true);
+      setError(null);
+      
+      // Usar o primeiro lembrete para o teste
+      const testReminder = reminders[0];
+      const medicationIndex = 0;
+      
+      // Enviar uma solicitação de webhook de teste
+      const response = await fetch('/api/reminders/webhook', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          reminderId: testReminder.id,
+          medicationIndex,
+          webhookUrl,
+          webhookSecret,
+          eventType: 'reminder_test',
+          eventDescription: 'Teste de webhook'
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro ao testar webhook: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Resultado do teste:', result);
+      
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (error) {
+      console.error('Erro ao testar webhook:', error);
+      setError('Erro ao testar webhook. Verifique o console para mais detalhes.');
     } finally {
       setIsSaving(false);
     }
@@ -133,9 +227,17 @@ export default function WebhookConfigPage() {
         <button
           onClick={saveWebhookConfig}
           disabled={isSaving}
-          className="px-4 py-2 bg-blue-500 text-white font-medium rounded-md hover:bg-blue-600 disabled:opacity-50"
+          className="px-4 py-2 bg-blue-500 text-white font-medium rounded-md hover:bg-blue-600 disabled:opacity-50 mr-2"
         >
           {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+        </button>
+        
+        <button
+          onClick={testWebhook}
+          disabled={isSaving || !webhookUrl}
+          className="px-4 py-2 bg-green-500 text-white font-medium rounded-md hover:bg-green-600 disabled:opacity-50"
+        >
+          Testar Webhook
         </button>
       </div>
       

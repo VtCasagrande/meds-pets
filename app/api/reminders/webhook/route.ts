@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import Reminder from '@/app/lib/models/Reminder';
-import { WebhookPayload } from '@/app/lib/types';
+import { WebhookPayload, WebhookEventType } from '@/app/lib/types';
 
 // POST /api/reminders/webhook - Endpoint para disparar webhook
 export async function POST(request: NextRequest) {
@@ -9,7 +9,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     
     // Obter os dados necessários
-    const { reminderId, medicationIndex, webhookUrl, webhookSecret } = body;
+    const { 
+      reminderId, 
+      medicationIndex, 
+      webhookUrl, 
+      webhookSecret,
+      eventType = 'reminder_notification',  // Padrão é notificação
+      eventDescription = 'Lembrete de medicamento' 
+    } = body;
     
     if (!reminderId || medicationIndex === undefined) {
       return NextResponse.json(
@@ -40,12 +47,32 @@ export async function POST(request: NextRequest) {
     
     const medicationProduct = reminder.medicationProducts[medicationIndex];
     
+    // Definir descrição do evento com base no tipo
+    let finalEventDescription = eventDescription;
+    if (!eventDescription) {
+      switch (eventType as WebhookEventType) {
+        case 'reminder_created':
+          finalEventDescription = 'Novo lembrete criado';
+          break;
+        case 'reminder_updated':
+          finalEventDescription = 'Lembrete atualizado';
+          break;
+        case 'reminder_notification':
+          finalEventDescription = `Notificação de medicamento: ${medicationProduct.title}`;
+          break;
+        default:
+          finalEventDescription = 'Evento de lembrete';
+      }
+    }
+    
     // Preparar payload do webhook
     const webhookPayload: WebhookPayload = {
       reminderId: reminder._id ? reminder._id.toString() : reminderId,
       tutorName: reminder.tutorName,
       petName: reminder.petName,
       phoneNumber: reminder.phoneNumber,
+      eventType: eventType as WebhookEventType,
+      eventDescription: finalEventDescription,
       medicationProduct: {
         title: medicationProduct.title,
         quantity: medicationProduct.quantity,
