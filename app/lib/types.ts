@@ -10,6 +10,7 @@ export type MedicationProduct = {
 // Representação do lembrete para os formulários e API
 export type Reminder = {
   id?: string;
+  _id?: string; // ID do MongoDB
   tutorName: string;
   petName: string;
   petBreed: string;
