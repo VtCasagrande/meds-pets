@@ -214,7 +214,14 @@ async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
       phoneNumber: reminderDoc.phoneNumber,
       isActive: reminderDoc.isActive,
       medicationProducts: reminderDoc.medicationProducts.map(product => ({
-        ...product.toObject(),
+        id: product.id,
+        title: product.title,
+        quantity: product.quantity,
+        frequency: product.frequency || '',
+        frequencyValue: product.frequencyValue || 0,
+        frequencyUnit: product.frequencyUnit || 'horas',
+        duration: product.duration || 0,
+        durationUnit: product.durationUnit || 'dias',
         startDateTime: product.startDateTime ? product.startDateTime.toISOString() : '',
         endDateTime: product.endDateTime ? product.endDateTime.toISOString() : ''
       })),
