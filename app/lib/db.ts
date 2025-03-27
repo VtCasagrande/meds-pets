@@ -64,12 +64,14 @@ async function dbConnect() {
     const opts = {
       bufferCommands: false,
       // Adicionar retry e timeout
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 20000, // Aumentado para 20s
+      socketTimeoutMS: 60000, // Aumentado para 60s
+      connectTimeoutMS: 20000, // Aumentado para 20s
       // Aumentar retries
       maxPoolSize: 10,
       minPoolSize: 5,
+      retryWrites: true,
+      retryReads: true
     };
 
     console.log('Iniciando nova conexão ao MongoDB...');
@@ -78,12 +80,18 @@ async function dbConnect() {
     // Mascarar as credenciais nos logs
     const maskedUri = MONGODB_URI_VERIFIED.replace(/mongodb(\+srv)?:\/\/([^:]+):([^@]+)@/, 'mongodb$1://***:***@');
     console.log('URI do MongoDB (mascarada):', maskedUri);
+    console.log('Tentando conectar com as seguintes opções:', JSON.stringify(opts, null, 2));
 
     cached.promise = mongoose.connect(MONGODB_URI_VERIFIED, opts)
       .then((mongoose) => {
         console.log('Conectado ao MongoDB com sucesso!');
         console.log('Nome da Database:', mongoose.connection.name);
         console.log('Host do MongoDB:', mongoose.connection.host);
+        console.log('Detalhes da conexão:', {
+          readyState: mongoose.connection.readyState,
+          modelNames: mongoose.modelNames(),
+          collections: Object.keys(mongoose.connection.collections)
+        });
         return mongoose.connection;
       })
       .catch((error) => {
@@ -93,6 +101,13 @@ async function dbConnect() {
             message: error.message,
             reason: error.reason?.toString(),
             hosts: JSON.stringify(error.topology?.s?.description?.servers || {}),
+          });
+        }
+        if (error.name === 'MongoNetworkError') {
+          console.error('Erro de rede MongoDB:', {
+            message: error.message,
+            dnsHostname: error.dnsHostname,
+            errorLabels: error.errorLabels
           });
         }
         cached.promise = null;

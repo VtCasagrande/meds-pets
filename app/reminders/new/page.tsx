@@ -78,16 +78,30 @@ export default function NewReminderPage() {
       setIsSubmitting(true);
       setError(null);
       
+      // Formatar os medicamentos para garantir que startDateTime seja uma data válida
+      const formattedReminder = {
+        ...reminder,
+        medicationProducts: reminder.medicationProducts.map(product => ({
+          ...product,
+          // Garantir que a data seja um objeto Date válido para o MongoDB
+          startDateTime: new Date(product.startDateTime).toISOString()
+        }))
+      };
+      
+      console.log('Enviando dados:', JSON.stringify(formattedReminder, null, 2));
+      
       const response = await fetch('/api/reminders', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(reminder)
+        body: JSON.stringify(formattedReminder)
       });
       
       if (!response.ok) {
-        throw new Error('Erro ao criar o lembrete');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Erro da API:', errorData);
+        throw new Error(errorData.error || 'Erro ao criar o lembrete');
       }
       
       router.push('/reminders');
