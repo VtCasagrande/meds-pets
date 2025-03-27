@@ -8,10 +8,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     
-    // Validar se é uma solicitação de webhook válida
-    // Aqui você pode verificar tokens de autenticação, chaves de API, etc.
-    
-    const { reminderId, medicationIndex } = body;
+    // Obter os dados necessários
+    const { reminderId, medicationIndex, webhookUrl, webhookSecret } = body;
     
     if (!reminderId || medicationIndex === undefined) {
       return NextResponse.json(
@@ -54,16 +52,67 @@ export async function POST(request: NextRequest) {
       }
     };
     
-    // Aqui você pode enviar as notificações para os serviços externos
-    // Exemplo: enviar SMS, notificar APIs externas, etc.
-    console.log('Enviando notificação:', webhookPayload);
+    console.log('Payload preparado:', webhookPayload);
     
-    // Simular envio bem-sucedido
-    return NextResponse.json({
-      success: true,
-      message: 'Webhook processado com sucesso',
-      payload: webhookPayload
-    });
+    // Verificar se temos um URL para enviar o webhook
+    if (webhookUrl) {
+      console.log(`Enviando webhook para URL: ${webhookUrl}`);
+      
+      try {
+        // Configurar headers para incluir a chave secreta, se fornecida
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json'
+        };
+        
+        if (webhookSecret) {
+          headers['X-Webhook-Secret'] = webhookSecret;
+        }
+        
+        // Enviar o webhook para a URL configurada
+        const webhookResponse = await fetch(webhookUrl, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(webhookPayload)
+        });
+        
+        const responseStatus = webhookResponse.status;
+        console.log(`Resposta do webhook: status ${responseStatus}`);
+        
+        let responseData;
+        try {
+          responseData = await webhookResponse.json();
+          console.log('Dados da resposta:', responseData);
+        } catch (e) {
+          console.log('Não foi possível obter dados JSON da resposta');
+        }
+        
+        return NextResponse.json({
+          success: true,
+          message: 'Webhook processado com sucesso',
+          payload: webhookPayload,
+          webhookResponse: {
+            status: responseStatus,
+            data: responseData
+          }
+        });
+      } catch (webhookError) {
+        console.error('Erro ao enviar webhook:', webhookError);
+        return NextResponse.json({
+          success: false,
+          error: 'Erro ao enviar webhook para a URL configurada',
+          payload: webhookPayload
+        }, { status: 500 });
+      }
+    } else {
+      console.log('Nenhuma URL de webhook configurada, simulando envio bem-sucedido');
+      
+      // Simular envio bem-sucedido quando não há URL configurada
+      return NextResponse.json({
+        success: true,
+        message: 'Webhook processado com sucesso (simulação)',
+        payload: webhookPayload
+      });
+    }
   } catch (error) {
     console.error('Erro ao processar webhook:', error);
     return NextResponse.json(

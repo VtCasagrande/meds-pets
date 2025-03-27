@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MedicationProduct } from '../lib/types';
 import { formatDate } from '../lib/dateUtils';
 
@@ -13,6 +13,20 @@ export default function WebhooksList({ medications, reminderId }: WebhooksListPr
   const [loading, setLoading] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<number | null>(null);
+  const [webhookUrl, setWebhookUrl] = useState<string>('');
+  const [webhookSecret, setWebhookSecret] = useState<string>('');
+
+  useEffect(() => {
+    // Carregar configurações de webhook do localStorage
+    try {
+      const savedUrl = localStorage.getItem('webhookUrl') || '';
+      const savedSecret = localStorage.getItem('webhookSecret') || '';
+      setWebhookUrl(savedUrl);
+      setWebhookSecret(savedSecret);
+    } catch (err) {
+      console.error('Erro ao carregar configurações do webhook:', err);
+    }
+  }, []);
 
   const triggerWebhook = async (medicationIndex: number) => {
     setLoading(medicationIndex);
@@ -20,6 +34,8 @@ export default function WebhooksList({ medications, reminderId }: WebhooksListPr
     setSuccess(null);
     
     try {
+      console.log(`Disparando webhook para medicamento ${medicationIndex} com URL: ${webhookUrl}`);
+      
       const response = await fetch('/api/reminders/webhook', {
         method: 'POST',
         headers: {
@@ -28,6 +44,8 @@ export default function WebhooksList({ medications, reminderId }: WebhooksListPr
         body: JSON.stringify({
           reminderId,
           medicationIndex,
+          webhookUrl,
+          webhookSecret
         }),
       });
 
@@ -50,6 +68,25 @@ export default function WebhooksList({ medications, reminderId }: WebhooksListPr
   return (
     <div className="mt-6">
       <h4 className="text-lg font-semibold mb-3">Disparar Notificações (Webhooks)</h4>
+      
+      {!webhookUrl && (
+        <div className="bg-yellow-100 text-yellow-800 p-3 rounded-md mb-4">
+          <p>Nenhuma URL de webhook configurada. As notificações serão simuladas.</p>
+          <a 
+            href="/webhook" 
+            className="text-blue-600 hover:text-blue-800 underline mt-1 inline-block"
+          >
+            Configurar Webhook
+          </a>
+        </div>
+      )}
+      
+      {webhookUrl && (
+        <div className="bg-blue-50 text-blue-800 p-3 rounded-md mb-4">
+          <p><strong>URL configurada:</strong> {webhookUrl}</p>
+          {webhookSecret && <p><strong>Autenticação:</strong> Configurada</p>}
+        </div>
+      )}
       
       {error && (
         <div className="bg-red-100 text-red-700 p-3 rounded-md mb-4">
