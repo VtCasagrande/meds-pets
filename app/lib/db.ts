@@ -10,6 +10,9 @@ if (!MONGODB_URI) {
   );
 }
 
+// Como já verificamos que MONGODB_URI não é undefined acima, podemos definir uma constante para TypeScript
+const MONGODB_URI_VERIFIED: string = MONGODB_URI;
+
 // Definir a interface para o cache
 interface MongooseCache {
   conn: mongoose.Connection | null;
@@ -44,9 +47,11 @@ async function dbConnect() {
     };
 
     console.log('Conectando ao MongoDB...');
-    console.log('URI do MongoDB:', MONGODB_URI.replace(/mongo:\/\/.*?@/, 'mongo://*****@'));
+    
+    // Usar a versão verificada para evitar erro de tipo
+    console.log('URI do MongoDB:', MONGODB_URI_VERIFIED.replace(/mongo:\/\/.*?@/, 'mongo://*****@'));
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts)
+    cached.promise = mongoose.connect(MONGODB_URI_VERIFIED, opts)
       .then((mongoose) => {
         console.log('Conectado ao MongoDB com sucesso!');
         return mongoose.connection;
