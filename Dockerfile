@@ -8,8 +8,17 @@ FROM base AS deps
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Construir a aplicação
+# Adicionar os argumentos de build para poder usá-los
 FROM base AS builder
+ARG MONGODB_URI
+ARG NODE_ENV
+ARG NEXT_PUBLIC_BASE_URL
+
+# Configurar as variáveis de ambiente para o build
+ENV MONGODB_URI=$MONGODB_URI
+ENV NODE_ENV=$NODE_ENV
+ENV NEXT_PUBLIC_BASE_URL=$NEXT_PUBLIC_BASE_URL
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # Garantir que o diretório public existe
