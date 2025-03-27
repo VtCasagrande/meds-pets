@@ -72,26 +72,46 @@ export default function EditReminderPage({ params }: { params: { id: string } })
           // Calcular data de término se não existir
           let endDateTime = product.endDateTime ? new Date(product.endDateTime).toISOString().slice(0, 16) : '';
           if (!endDateTime && startDateTime) {
-            const endDate = new Date(startDateTime);
-            console.log('Data inicial para cálculo:', endDate.toISOString());
+            // Data original como objeto Date
+            const startDate = new Date(startDateTime);
+            console.log('Data inicial para cálculo (edit page):', startDate.toISOString());
+            console.log('Duração:', duration, durationUnit);
             
-            // Preservar a hora original
-            const originalHours = endDate.getHours();
-            const originalMinutes = endDate.getMinutes();
+            // Criar uma nova data para o cálculo
+            const endDate = new Date(startDate.getTime());
             
-            // Calcular com base na duração
-            if (durationUnit === 'dias') {
-              endDate.setDate(endDate.getDate() + duration);
-            } else if (durationUnit === 'semanas') {
-              endDate.setDate(endDate.getDate() + (duration * 7));
-            } else if (durationUnit === 'meses') {
-              endDate.setMonth(endDate.getMonth() + duration);
+            // Preservar a hora original com precisão
+            const originalHours = startDate.getHours();
+            const originalMinutes = startDate.getMinutes();
+            const originalSeconds = startDate.getSeconds();
+            
+            console.log('Hora original:', originalHours, 'Minutos original:', originalMinutes);
+            
+            // Realizar o cálculo baseado na duração
+            switch (durationUnit) {
+              case 'dias':
+                // Para 1 dia, calcular exatamente 24 horas depois
+                if (duration === 1) {
+                  endDate.setTime(startDate.getTime() + (24 * 60 * 60 * 1000));
+                } else {
+                  endDate.setDate(startDate.getDate() + duration);
+                }
+                break;
+              case 'semanas':
+                endDate.setDate(startDate.getDate() + (duration * 7));
+                break;
+              case 'meses':
+                endDate.setMonth(startDate.getMonth() + duration);
+                break;
             }
             
-            // Garantir que a hora seja mantida
-            endDate.setHours(originalHours, originalMinutes);
+            // Certificar-se de que a hora original seja mantida
+            endDate.setHours(originalHours);
+            endDate.setMinutes(originalMinutes);
+            endDate.setSeconds(originalSeconds);
             
-            console.log('Data final calculada:', endDate.toISOString());
+            console.log('Hora calculada:', endDate.getHours(), 'Minutos calculados:', endDate.getMinutes());
+            console.log('Data final calculada (edit page):', endDate.toISOString());
             endDateTime = endDate.toISOString().slice(0, 16);
           }
           

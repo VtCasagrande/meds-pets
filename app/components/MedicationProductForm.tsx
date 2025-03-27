@@ -13,15 +13,27 @@ interface MedicationProductFormProps {
 function calculateEndDate(startDate: string, duration: number, durationUnit: string): string {
   // Criar uma nova data a partir da data de início
   const date = new Date(startDate);
+  const originalDate = new Date(startDate);
   console.log('Data inicial para cálculo:', date.toISOString());
+  console.log('Duração:', duration, durationUnit);
   
-  // Obter os componentes da data original
+  // Obter os componentes da data e hora original
   const originalHours = date.getHours();
   const originalMinutes = date.getMinutes();
+  const originalSeconds = date.getSeconds();
   
+  // Verificar se há problemas com o timezone
+  console.log('Hora original:', originalHours, 'Minutos original:', originalMinutes);
+  
+  // Realizar o cálculo da data de término
   switch(durationUnit) {
     case 'dias':
-      date.setDate(date.getDate() + duration);
+      // Usar o método set para calcular a data exata
+      const newDate = new Date(date.getTime());
+      newDate.setDate(date.getDate() + duration);
+      // Copiar a nova data
+      date.setTime(newDate.getTime());
+      console.log('Nova data após adicionar dias:', date.toISOString());
       break;
     case 'semanas':
       date.setDate(date.getDate() + (duration * 7));
@@ -31,10 +43,16 @@ function calculateEndDate(startDate: string, duration: number, durationUnit: str
       break;
   }
   
-  // Garantir que a hora seja mantida
-  date.setHours(originalHours, originalMinutes);
+  // Garantir que a hora seja mantida exatamente igual
+  date.setHours(originalHours);
+  date.setMinutes(originalMinutes);
+  date.setSeconds(originalSeconds);
   
+  // Verificar se o horário foi mantido
+  console.log('Hora após ajuste:', date.getHours(), 'Minutos após ajuste:', date.getMinutes());
+  console.log('Data original:', originalDate.toISOString());
   console.log('Data calculada após duração:', date.toISOString());
+  
   return date.toISOString().slice(0, 16); // Formato para datetime-local
 }
 

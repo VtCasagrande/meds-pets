@@ -105,16 +105,25 @@ export default function NewReminderPage() {
       setIsSubmitting(true);
       setError(null);
       
-      // Formatar os medicamentos para garantir que startDateTime seja uma data válida
+      // Formatar os medicamentos para garantir que startDateTime e endDateTime sejam corretos
       const formattedReminder = {
         ...reminder,
-        medicationProducts: reminder.medicationProducts.map(product => ({
-          ...product,
-          // Garantir que a data seja um objeto Date válido para o MongoDB
-          startDateTime: new Date(product.startDateTime).toISOString(),
-          // Incluir a data de término calculada
-          endDateTime: product.endDateTime ? new Date(product.endDateTime).toISOString() : undefined
-        }))
+        medicationProducts: reminder.medicationProducts.map(product => {
+          console.log('Formatando produto para envio:', product);
+          // Datas originais
+          const startDateTime = new Date(product.startDateTime);
+          const endDateTime = product.endDateTime ? new Date(product.endDateTime) : null;
+          
+          console.log('Data inicial:', startDateTime.toISOString());
+          console.log('Data de término:', endDateTime ? endDateTime.toISOString() : 'não definida');
+          
+          return {
+            ...product,
+            // Garantir que as datas sejam gravadas como ISO strings
+            startDateTime: startDateTime.toISOString(),
+            endDateTime: endDateTime ? endDateTime.toISOString() : undefined
+          };
+        })
       };
       
       console.log('Enviando dados:', JSON.stringify(formattedReminder, null, 2));
