@@ -33,7 +33,23 @@ export default function MedicationProductForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    e.stopPropagation();
+    
+    if (!product.title || !product.quantity || !product.frequency || !product.startDateTime) {
+      alert('Por favor, preencha todos os campos do medicamento.');
+      return;
+    }
+    
     onAdd(product);
+    
+    if (!initialData) {
+      setProduct({
+        title: '',
+        quantity: '',
+        frequency: '',
+        startDateTime: new Date().toISOString().slice(0, 16)
+      });
+    }
   };
 
   return (
@@ -42,7 +58,7 @@ export default function MedicationProductForm({
         {initialData ? 'Editar Medicamento' : 'Adicionar Medicamento'}
       </h3>
       
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} method="dialog">
         <div className="mb-4">
           <label htmlFor="title" className="block text-sm font-medium text-gray-700">
             Nome do Medicamento

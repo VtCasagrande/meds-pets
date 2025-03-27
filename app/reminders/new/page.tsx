@@ -32,6 +32,15 @@ export default function NewReminderPage() {
   };
 
   const handleAddProduct = (product: MedicationProduct) => {
+    if (!product.title || !product.quantity || !product.frequency || !product.startDateTime) {
+      setError('Todos os campos do medicamento são obrigatórios.');
+      return;
+    }
+
+    setError(null);
+    
+    console.log('Adicionando medicamento:', product);
+    
     setReminder((prev) => {
       if (editingProductIndex !== null) {
         // Editando um produto existente
@@ -104,6 +113,7 @@ export default function NewReminderPage() {
         throw new Error(errorData.error || 'Erro ao criar o lembrete');
       }
       
+      // Redirecionar para a lista de lembretes após sucesso
       router.push('/reminders');
     } catch (error) {
       console.error('Erro ao criar lembrete:', error);
