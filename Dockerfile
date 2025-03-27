@@ -72,7 +72,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 EXPOSE 3000
 
 # Definir o comando de inicialização
-ENV PORT 3000
+ENV PORT=3000
 
 # Iniciar aplicação
 CMD ["npm", "start"] 

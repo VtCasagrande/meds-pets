@@ -109,7 +109,7 @@ async function dbConnect() {
       console.log('Teste de conexão bem-sucedido com MongoClient');
       await client.close();
       console.log('Conexão de teste fechada');
-    } catch (testError) {
+    } catch (testError: any) {
       console.error('Teste de conexão falhou:', testError);
       if (testError.name === 'MongoServerError' && testError.code === 18) {
         console.error('ERRO DE AUTENTICAÇÃO: Verifique as credenciais na string de conexão');
