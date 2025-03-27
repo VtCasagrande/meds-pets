@@ -8,6 +8,14 @@ if (!MONGODB_URI) {
   );
 }
 
+// Adicionar tipagem para o objeto global
+declare global {
+  var mongoose: {
+    conn: mongoose.Connection | null;
+    promise: Promise<mongoose.Connection> | null;
+  } | undefined;
+}
+
 let cached = global.mongoose;
 
 if (!cached) {
@@ -25,7 +33,7 @@ async function dbConnect() {
     };
 
     cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      return mongoose;
+      return mongoose.connection;
     });
   }
   
