@@ -48,7 +48,13 @@ export async function POST(request: NextRequest) {
       phoneNumber: reminder.phoneNumber,
       medicationProduct: {
         title: medicationProduct.title,
-        quantity: medicationProduct.quantity
+        quantity: medicationProduct.quantity,
+        frequencyValue: medicationProduct.frequencyValue || 0,
+        frequencyUnit: medicationProduct.frequencyUnit || 'horas',
+        duration: medicationProduct.duration || 0,
+        durationUnit: medicationProduct.durationUnit || 'dias',
+        startDateTime: medicationProduct.startDateTime || '',
+        endDateTime: medicationProduct.endDateTime || ''
       }
     };
     

@@ -3,8 +3,15 @@ export type MedicationProduct = {
   id?: string;
   title: string;
   quantity: string;
-  frequency: string;
+  frequency: string; // Campo legado
+  // Novos campos para estruturar melhor a frequência
+  frequencyValue: number;
+  frequencyUnit: 'minutos' | 'horas' | 'dias';
+  // Campos para duração do tratamento
+  duration: number;
+  durationUnit: 'dias' | 'semanas' | 'meses';
   startDateTime: string; // ISO string para formulários
+  endDateTime?: string; // Data de término calculada
 }
 
 // Representação do lembrete para os formulários e API
@@ -36,5 +43,11 @@ export type WebhookPayload = {
   medicationProduct: {
     title: string;
     quantity: string;
+    frequencyValue: number;
+    frequencyUnit: string;
+    duration: number;
+    durationUnit: string;
+    startDateTime: string;
+    endDateTime?: string;
   }
 } 
