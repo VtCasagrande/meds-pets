@@ -6,6 +6,7 @@ import { Reminder } from '@/app/lib/types';
 import MedicationProductList from '@/app/components/MedicationProductList';
 import { formatDate, formatRelativeDate } from '@/app/lib/dateUtils';
 import Link from 'next/link';
+import WebhooksList from '@/app/components/WebhooksList';
 
 export default function ReminderDetailsPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -24,13 +25,26 @@ export default function ReminderDetailsPage({ params }: { params: { id: string }
   const fetchReminderDetails = async () => {
     try {
       setIsLoading(true);
+      console.log(`Buscando detalhes do lembrete: ${id}`);
       const response = await fetch(`/api/reminders/${id}`);
       
       if (!response.ok) {
-        throw new Error('Erro ao buscar detalhes do lembrete');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Erro da API:', errorData);
+        throw new Error(errorData.error || 'Erro ao buscar detalhes do lembrete');
       }
       
       const data = await response.json();
+      console.log('Dados do lembrete recebidos:', data);
+      
+      // Converter campos de data para garantir compatibilidade
+      if (data.medicationProducts) {
+        data.medicationProducts = data.medicationProducts.map((product: any) => ({
+          ...product,
+          startDateTime: product.startDateTime || new Date().toISOString()
+        }));
+      }
+
       setReminder(data);
       setError(null);
     } catch (error) {
@@ -203,6 +217,13 @@ export default function ReminderDetailsPage({ params }: { params: { id: string }
           <h4 className="text-lg font-semibold mb-3">Medicamentos</h4>
           <MedicationProductList products={reminder.medicationProducts} />
         </div>
+        
+        {reminder.isActive && (
+          <WebhooksList 
+            medications={reminder.medicationProducts}
+            reminderId={id}
+          />
+        )}
         
         {reminder.createdAt && (
           <div className="text-xs text-gray-500 mt-4 pt-4 border-t border-gray-200">
