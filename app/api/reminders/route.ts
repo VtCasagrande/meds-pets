@@ -161,6 +161,7 @@ export async function POST(request: NextRequest) {
           reminderId: reminder._id ? reminder._id.toString() : '',
           tutorName: reminder.tutorName,
           petName: reminder.petName,
+          petBreed: reminder.petBreed || '',
           phoneNumber: reminder.phoneNumber,
           eventType: 'reminder_created',
           eventDescription: 'Novo lembrete criado',

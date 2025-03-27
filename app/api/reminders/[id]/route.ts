@@ -163,6 +163,7 @@ export async function PUT(
         reminderId: updatedReminder._id ? updatedReminder._id.toString() : id,
         tutorName: updatedReminder.tutorName,
         petName: updatedReminder.petName,
+        petBreed: updatedReminder.petBreed || '',
         phoneNumber: updatedReminder.phoneNumber,
         eventType: 'reminder_updated',
         eventDescription: 'Lembrete atualizado',
