@@ -9,15 +9,15 @@ interface MedicationProductFormProps {
   initialData?: MedicationProduct;
 }
 
-// Função para calcular a data de término com base na duração
-function calculateEndDate(startDate: string, duration: number, durationUnit: string): string {
+// Função para calcular a data de término com base na duração e frequência
+function calculateEndDate(
+  startDate: string, 
+  duration: number, 
+  durationUnit: string
+): string {
   console.log('Calculando data de término para:', startDate, duration, durationUnit);
   
   // Converter a string de data para um objeto Date
-  // Ao usar o formato 'YYYY-MM-DDTHH:MM', o JavaScript assume UTC
-  // Então vamos garantir que o fuso horário local seja respeitado
-  
-  // Primeiro, converta a string para um objeto Date
   const startDateObj = new Date(startDate);
   console.log('Data de início (objeto):', startDateObj);
   console.log('Data de início (ISO):', startDateObj.toISOString());
@@ -91,18 +91,44 @@ export default function MedicationProductForm({
       endDateTime: ''
     }
   );
+  
+  // Contador para forçar atualizações quando necessário
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
+  // Função para forçar recálculo da data final
+  const forceRecalculation = () => {
+    console.log('Forçando recálculo da data final...');
+    setForceUpdate(prev => prev + 1);
+  };
 
-  // Calcular data de término quando a data de início ou a duração mudar
+  // Calcular data de término quando a data de início, duração ou frequência mudar
   useEffect(() => {
     if (product.startDateTime && product.duration && product.durationUnit) {
+      console.log('Recalculando data de término devido a mudanças em:', {
+        startDateTime: product.startDateTime,
+        duration: product.duration,
+        durationUnit: product.durationUnit,
+        frequencyValue: product.frequencyValue,
+        frequencyUnit: product.frequencyUnit,
+        forceUpdate
+      });
+      
+      // Forçar recálculo ao alterar duração e frequência
+      // Isso resolve o problema de estado do React que pode não detectar mudanças profundas
       const endDate = calculateEndDate(
         product.startDateTime, 
         product.duration, 
         product.durationUnit
       );
-      setProduct(prev => ({ ...prev, endDateTime: endDate }));
+      
+      console.log('Nova data de término calculada:', endDate);
+      setProduct(prev => {
+        const updated = { ...prev, endDateTime: endDate };
+        console.log('Novo estado do produto:', updated);
+        return updated;
+      });
     }
-  }, [product.startDateTime, product.duration, product.durationUnit]);
+  }, [product.startDateTime, product.duration, product.durationUnit, forceUpdate]);
 
   // Atualizar o campo de frequência legado quando os novos campos mudarem
   useEffect(() => {
@@ -120,6 +146,14 @@ export default function MedicationProductForm({
       if (name === 'frequencyValue' || name === 'duration') {
         return { ...prev, [name]: Number(value) };
       }
+      
+      // Se o campo alterado for relacionado à frequência, vamos garantir
+      // que a data de término seja recalculada
+      if (name === 'frequencyValue' || name === 'frequencyUnit') {
+        // Programar um recálculo forçado
+        setTimeout(() => forceRecalculation(), 0);
+      }
+      
       return { ...prev, [name]: value };
     });
   };
@@ -133,8 +167,20 @@ export default function MedicationProductForm({
       return;
     }
     
-    console.log('Enviando medicamento:', product);
-    onAdd(product);
+    // Garantir que a data final está atualizada antes de enviar
+    const updatedEndDate = calculateEndDate(
+      product.startDateTime, 
+      product.duration, 
+      product.durationUnit
+    );
+    
+    const finalProduct = {
+      ...product,
+      endDateTime: updatedEndDate
+    };
+    
+    console.log('Enviando medicamento:', finalProduct);
+    onAdd(finalProduct);
     
     if (!initialData) {
       setProduct({
@@ -286,6 +332,17 @@ export default function MedicationProductForm({
             value={product.endDateTime || ''}
             className="input-field bg-gray-100"
           />
+          {product.endDateTime && (
+            <p className="text-sm text-gray-500 mt-1">
+              Término: {new Date(product.endDateTime).toLocaleString('pt-BR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </p>
+          )}
         </div>
         
         <div className="flex justify-end space-x-2">
