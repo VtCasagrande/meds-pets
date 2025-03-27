@@ -160,7 +160,7 @@ export async function PUT(
       
       // Preparar payload do webhook
       const webhookPayload: WebhookPayload = {
-        reminderId: updatedReminder._id.toString(),
+        reminderId: updatedReminder._id ? updatedReminder._id.toString() : id,
         tutorName: updatedReminder.tutorName,
         petName: updatedReminder.petName,
         phoneNumber: updatedReminder.phoneNumber,
