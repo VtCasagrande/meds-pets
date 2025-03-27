@@ -27,6 +27,14 @@ let scheduledTasks: ScheduledTask[] = [];
 // Intervalo que verifica tarefas a cada minuto
 let schedulerInterval: NodeJS.Timeout | null = null;
 
+// Função auxiliar para formatar data segura (independente do tipo)
+function formatDateSafe(date: any): string {
+  if (!date) return '';
+  if (typeof date === 'string') return date;
+  if (date && typeof date.toISOString === 'function') return date.toISOString();
+  return '';
+}
+
 // Iniciar o agendador
 export function startScheduler() {
   // Verificar se estamos em ambiente de servidor (não Edge)
@@ -121,16 +129,8 @@ async function executeTask(task: ScheduledTask) {
         frequencyUnit: medicationProduct.frequencyUnit || 'horas',
         duration: medicationProduct.duration || 0,
         durationUnit: medicationProduct.durationUnit || 'dias',
-        startDateTime: (typeof medicationProduct.startDateTime === 'string')
-          ? medicationProduct.startDateTime
-          : (medicationProduct.startDateTime instanceof Date)
-            ? medicationProduct.startDateTime.toISOString()
-            : '',
-        endDateTime: (typeof medicationProduct.endDateTime === 'string')
-          ? medicationProduct.endDateTime
-          : (medicationProduct.endDateTime instanceof Date)
-            ? medicationProduct.endDateTime.toISOString()
-            : ''
+        startDateTime: formatDateSafe(medicationProduct.startDateTime),
+        endDateTime: formatDateSafe(medicationProduct.endDateTime)
       }
     };
     
@@ -244,16 +244,8 @@ async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
           frequencyUnit: frequencyUnit,
           duration: product.duration || 0,
           durationUnit: durationUnit,
-          startDateTime: (typeof product.startDateTime === 'string')
-            ? product.startDateTime
-            : (product.startDateTime instanceof Date)
-              ? product.startDateTime.toISOString()
-              : '',
-          endDateTime: (typeof product.endDateTime === 'string')
-            ? product.endDateTime
-            : (product.endDateTime instanceof Date)
-              ? product.endDateTime.toISOString()
-              : ''
+          startDateTime: formatDateSafe(product.startDateTime),
+          endDateTime: formatDateSafe(product.endDateTime)
         };
       }),
       createdAt: reminderDoc.createdAt,
