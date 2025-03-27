@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     
     // Verificar formato da data nos medicamentos
     try {
-      body.medicationProducts = body.medicationProducts.map(product => ({
+      body.medicationProducts = body.medicationProducts.map((product: { startDateTime: string | Date }) => ({
         ...product,
         startDateTime: new Date(product.startDateTime)
       }));
