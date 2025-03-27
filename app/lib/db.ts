@@ -89,7 +89,6 @@ async function dbConnect() {
       retryReads: true,
       // Opções de autenticação
       authSource: 'admin', // Banco de dados para autenticação (pode precisar ser ajustado)
-      authMechanism: 'DEFAULT', // Mecanismo de autenticação padrão
     };
 
     console.log('Iniciando nova conexão ao MongoDB...');
