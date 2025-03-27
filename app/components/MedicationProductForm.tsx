@@ -11,7 +11,13 @@ interface MedicationProductFormProps {
 
 // Função para calcular a data de término com base na duração
 function calculateEndDate(startDate: string, duration: number, durationUnit: string): string {
+  // Criar uma nova data a partir da data de início
   const date = new Date(startDate);
+  console.log('Data inicial para cálculo:', date.toISOString());
+  
+  // Obter os componentes da data original
+  const originalHours = date.getHours();
+  const originalMinutes = date.getMinutes();
   
   switch(durationUnit) {
     case 'dias':
@@ -25,6 +31,10 @@ function calculateEndDate(startDate: string, duration: number, durationUnit: str
       break;
   }
   
+  // Garantir que a hora seja mantida
+  date.setHours(originalHours, originalMinutes);
+  
+  console.log('Data calculada após duração:', date.toISOString());
   return date.toISOString().slice(0, 16); // Formato para datetime-local
 }
 

@@ -73,6 +73,11 @@ export default function EditReminderPage({ params }: { params: { id: string } })
           let endDateTime = product.endDateTime ? new Date(product.endDateTime).toISOString().slice(0, 16) : '';
           if (!endDateTime && startDateTime) {
             const endDate = new Date(startDateTime);
+            console.log('Data inicial para cálculo:', endDate.toISOString());
+            
+            // Preservar a hora original
+            const originalHours = endDate.getHours();
+            const originalMinutes = endDate.getMinutes();
             
             // Calcular com base na duração
             if (durationUnit === 'dias') {
@@ -83,6 +88,10 @@ export default function EditReminderPage({ params }: { params: { id: string } })
               endDate.setMonth(endDate.getMonth() + duration);
             }
             
+            // Garantir que a hora seja mantida
+            endDate.setHours(originalHours, originalMinutes);
+            
+            console.log('Data final calculada:', endDate.toISOString());
             endDateTime = endDate.toISOString().slice(0, 16);
           }
           
