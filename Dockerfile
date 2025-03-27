@@ -12,6 +12,8 @@ RUN npm ci
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# Garantir que o diretório public existe
+RUN mkdir -p public
 RUN npm run build
 
 # Imagem final de produção
@@ -21,10 +23,16 @@ ENV NODE_ENV=production
 # Adicionar usuário não-root
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
+
+# Criar estrutura de diretórios necessária
+WORKDIR /app
+RUN mkdir -p public .next/static
+RUN chown -R nextjs:nodejs /app
+
+# Mudar para usuário não-root
 USER nextjs
 
 # Copiar arquivos necessários
-COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
