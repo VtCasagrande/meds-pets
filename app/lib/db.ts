@@ -1,10 +1,12 @@
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/lembrete-meds';
+// Definir a URI do MongoDB baseada nas variáveis de ambiente
+const MONGODB_URI = process.env.MONGODB_URI;
 
+// Verificar se a URI do MongoDB está definida
 if (!MONGODB_URI) {
   throw new Error(
-    'Please define the MONGODB_URI environment variable'
+    'Por favor, defina a variável de ambiente MONGODB_URI'
   );
 }
 
@@ -27,22 +29,42 @@ if (!global.mongoose) {
 }
 
 async function dbConnect() {
+  // Se já temos uma conexão, retorná-la
   if (cached.conn) {
     return cached.conn;
   }
 
+  // Se ainda não temos uma promessa de conexão, criá-la
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
+      // Adicionar retry e timeout
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
     };
 
-    cached.promise = mongoose.connect(MONGODB_URI, opts).then((mongoose) => {
-      return mongoose.connection;
-    });
+    console.log('Conectando ao MongoDB...');
+    console.log('URI do MongoDB:', MONGODB_URI.replace(/mongo:\/\/.*?@/, 'mongo://*****@'));
+
+    cached.promise = mongoose.connect(MONGODB_URI, opts)
+      .then((mongoose) => {
+        console.log('Conectado ao MongoDB com sucesso!');
+        return mongoose.connection;
+      })
+      .catch((error) => {
+        console.error('Erro ao conectar ao MongoDB:', error);
+        cached.promise = null;
+        throw error;
+      });
   }
   
-  cached.conn = await cached.promise;
-  return cached.conn;
+  try {
+    cached.conn = await cached.promise;
+    return cached.conn;
+  } catch (e) {
+    cached.promise = null;
+    throw e;
+  }
 }
 
 export default dbConnect; 
