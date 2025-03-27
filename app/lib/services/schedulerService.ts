@@ -121,12 +121,16 @@ async function executeTask(task: ScheduledTask) {
         frequencyUnit: medicationProduct.frequencyUnit || 'horas',
         duration: medicationProduct.duration || 0,
         durationUnit: medicationProduct.durationUnit || 'dias',
-        startDateTime: typeof medicationProduct.startDateTime === 'string' ? 
-          medicationProduct.startDateTime : 
-          (medicationProduct.startDateTime ? medicationProduct.startDateTime.toISOString() : ''),
-        endDateTime: typeof medicationProduct.endDateTime === 'string' ? 
-          medicationProduct.endDateTime : 
-          (medicationProduct.endDateTime ? medicationProduct.endDateTime.toISOString() : '')
+        startDateTime: (typeof medicationProduct.startDateTime === 'string')
+          ? medicationProduct.startDateTime
+          : (medicationProduct.startDateTime instanceof Date)
+            ? medicationProduct.startDateTime.toISOString()
+            : '',
+        endDateTime: (typeof medicationProduct.endDateTime === 'string')
+          ? medicationProduct.endDateTime
+          : (medicationProduct.endDateTime instanceof Date)
+            ? medicationProduct.endDateTime.toISOString()
+            : ''
       }
     };
     
@@ -240,8 +244,16 @@ async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
           frequencyUnit: frequencyUnit,
           duration: product.duration || 0,
           durationUnit: durationUnit,
-          startDateTime: product.startDateTime ? product.startDateTime.toISOString() : '',
-          endDateTime: product.endDateTime ? product.endDateTime.toISOString() : ''
+          startDateTime: (typeof product.startDateTime === 'string')
+            ? product.startDateTime
+            : (product.startDateTime instanceof Date)
+              ? product.startDateTime.toISOString()
+              : '',
+          endDateTime: (typeof product.endDateTime === 'string')
+            ? product.endDateTime
+            : (product.endDateTime instanceof Date)
+              ? product.endDateTime.toISOString()
+              : ''
         };
       }),
       createdAt: reminderDoc.createdAt,
