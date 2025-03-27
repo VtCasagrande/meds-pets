@@ -54,7 +54,7 @@ export default function ReminderCard({ reminder }: ReminderCardProps) {
       
       <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
         <Link 
-          href={`/reminders/${reminder.id}`} 
+          href={`/reminders/${reminder._id || reminder.id}`} 
           className="text-blue-600 hover:text-blue-800 text-sm font-medium"
         >
           Ver detalhes

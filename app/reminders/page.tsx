@@ -24,12 +24,26 @@ export default function RemindersPage() {
       const response = await fetch('/api/reminders');
       
       if (!response.ok) {
-        throw new Error('Erro ao buscar os lembretes');
+        throw new Error('Erro ao buscar lembretes');
       }
       
       const data = await response.json();
-      setReminderState(data);
-      setError(null);
+      
+      // Garantir que todos os lembretes tenham o campo id preenchido com o _id do MongoDB
+      const processedActiveReminders = data.activeReminders.map((reminder: any) => ({
+        ...reminder,
+        id: reminder._id || reminder.id
+      }));
+      
+      const processedCompletedReminders = data.completedReminders.map((reminder: any) => ({
+        ...reminder,
+        id: reminder._id || reminder.id
+      }));
+      
+      setReminderState({
+        activeReminders: processedActiveReminders,
+        completedReminders: processedCompletedReminders
+      });
     } catch (error) {
       console.error('Erro ao buscar lembretes:', error);
       setError('Não foi possível carregar os lembretes. Tente novamente mais tarde.');

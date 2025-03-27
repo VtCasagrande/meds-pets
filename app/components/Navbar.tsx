@@ -43,6 +43,12 @@ export default function Navbar() {
             >
               Novo Lembrete
             </Link>
+            <Link 
+              href="/webhook" 
+              className={`px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 ${isActive('/webhook')}`}
+            >
+              Webhooks
+            </Link>
           </div>
         </div>
       </div>
