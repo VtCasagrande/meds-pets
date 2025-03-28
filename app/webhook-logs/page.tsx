@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, Fragment } from 'react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -254,7 +254,7 @@ export default function WebhookLogsPage() {
               </thead>
               <tbody>
                 {logs.map(log => (
-                  <React.Fragment key={log._id}>
+                  <Fragment key={log._id}>
                     <tr className={`border-b hover:bg-gray-50 ${log.success ? '' : 'bg-red-50'}`}>
                       <td className="py-2 px-4">{formatDate(log.createdAt)}</td>
                       <td className="py-2 px-4">{eventTypeLabels[log.eventType] || log.eventType}</td>
@@ -303,7 +303,7 @@ export default function WebhookLogsPage() {
                         </td>
                       </tr>
                     )}
-                  </React.Fragment>
+                  </Fragment>
                 ))}
               </tbody>
             </table>
