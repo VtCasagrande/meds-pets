@@ -4,7 +4,6 @@ import AuditLog, { IAuditLog } from '../models/AuditLog';
 import { getCurrentUserId } from '../auth';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/lib/auth';
-import { connect } from '@/app/lib/mongodb';
 import { headers } from 'next/headers';
 
 interface LogOptions {
@@ -39,8 +38,7 @@ interface LogActivityParams {
  */
 export async function logActivity(params: LogActivityParams) {
   try {
-    const { db } = await connect();
-    const collection = db.collection('auditLogs');
+    await dbConnect();
     
     let session;
     let headersList;
@@ -95,8 +93,8 @@ export async function logActivity(params: LogActivityParams) {
       createdAt: new Date()
     };
     
-    // Inserir no banco de dados
-    await collection.insertOne(logEntry);
+    // Inserir no banco de dados usando o modelo AuditLog
+    await AuditLog.create(logEntry);
     
     return { success: true };
   } catch (error) {
@@ -150,12 +148,13 @@ export async function getAuditLogs({
   const skip = (page - 1) * limit;
 
   // Ordenação
-  const sort = { createdAt: sortDirection === 'asc' ? 1 : -1 };
+  const sortValue = sortDirection === 'asc' ? 1 : -1;
+  const sortOptions = { createdAt: sortValue };
 
   // Executar consulta
   const total = await AuditLog.countDocuments(filter);
   const logs = await AuditLog.find(filter)
-    .sort(sort)
+    .sort(sortOptions as any)
     .skip(skip)
     .limit(limit);
 

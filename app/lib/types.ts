@@ -60,7 +60,7 @@ export type WebhookPayload = {
 }
 
 // Tipos para usuários e autenticação
-export type UserRole = 'admin' | 'user';
+export type UserRole = 'admin' | 'user' | 'creator';
 
 export type User = {
   id?: string;

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import Reminder from '@/app/lib/models/Reminder';
-import { WebhookPayload } from '@/app/lib/types';
+import { WebhookPayload, WebhookEventType } from '@/app/lib/types';
 import { Types } from 'mongoose';
-import { getCurrentUserId, getCurrentUserRole, requireAuth } from '@/app/lib/auth';
+import { getCurrentUserId, getCurrentUserRole, requireAuth, authOptions } from '@/app/lib/auth';
 import { logActivity } from '@/app/lib/services/auditLogService';
 import { getServerSession } from 'next-auth';
 import { removeReminderNotifications } from '@/app/lib/services/schedulerService';
 import { logReminderUpdate, logReminderDeletion } from '@/app/lib/logHelpers';
+import { Reminder as ReminderType } from '@/app/lib/types';
 
 // Importar funções do schedulerService apenas em ambiente Node.js
 let scheduleReminderNotifications: (reminder: any, webhookUrl?: string, webhookSecret?: string) => Promise<void> = 
@@ -220,7 +221,8 @@ export async function PUT(
     
     // Obter dados do usuário atual
     const userId = await getCurrentUserId();
-    const userEmail = (await getServerSession())?.user?.email || '';
+    const userEmail = (await getServerSession(authOptions))?.user?.email || '';
+    const userRole = await getCurrentUserRole();
     
     // Extrair a URL e chave secreta do webhook, se fornecidas
     // Ou usar as configurações de ambiente como fallback
@@ -256,7 +258,7 @@ export async function PUT(
         entityId: id,
         description: `Tentativa de atualizar lembrete inexistente`,
         request,
-        performedById: userId,
+        performedBy: userId || undefined,
         performedByEmail: userEmail
       });
       
@@ -267,9 +269,6 @@ export async function PUT(
     }
     
     // Verificar permissões - usuários comuns só podem editar seus próprios lembretes
-    const userId = await getCurrentUserId();
-    const userRole = await getCurrentUserRole();
-    
     if (userRole === 'user' && existingReminder.createdBy && existingReminder.createdBy.toString() !== userId) {
       console.log(`Acesso negado: Usuário ${userId} tentando editar lembrete de outro usuário`);
       return NextResponse.json(
@@ -321,7 +320,7 @@ export async function PUT(
         entityId: id,
         description: `Erro ao atualizar lembrete - não encontrado após atualização`,
         request,
-        performedById: userId,
+        performedBy: userId || undefined,
         performedByEmail: userEmail
       });
       
@@ -339,7 +338,7 @@ export async function PUT(
       : `Lembrete atualizado para "${updatedReminder.petName}" de ${updatedReminder.tutorName}`;
       
     await logReminderUpdate(
-      updatedReminder as Reminder,
+      updatedReminder as unknown as ReminderType,
       oldData,
       userId as string,
       userEmail as string,
@@ -349,7 +348,7 @@ export async function PUT(
     // Enviar webhook para o primeiro medicamento (atualização de lembrete)
     if (updatedReminder.medicationProducts.length > 0) {
       const firstProduct = updatedReminder.medicationProducts[0];
-      const webhookUrl = body.webhookUrl || webhookSecret || process.env.WEBHOOK_URL || '';
+      const webhookUrl = body.webhookUrl || process.env.WEBHOOK_URL || '';
       const webhookSecret = body.webhookSecret || process.env.WEBHOOK_SECRET || '';
       
       if (webhookUrl) {
@@ -400,6 +399,17 @@ export async function PUT(
   } catch (error) {
     console.error(`Erro ao atualizar lembrete ${id}:`, error);
     
+    // Obter dados do usuário para o log
+    let userId = 'sistema';
+    let userEmail = 'sistema@sistema.com';
+    
+    try {
+      userId = await getCurrentUserId() || 'sistema';
+      userEmail = (await getServerSession(authOptions))?.user?.email || 'sistema@sistema.com';
+    } catch (e) {
+      console.error('Erro ao obter dados do usuário para log:', e);
+    }
+    
     // Registrar erro no processo de atualização
     await logActivity({
       action: 'update',
@@ -407,7 +417,9 @@ export async function PUT(
       entityId: id,
       description: `Erro ao processar atualização de lembrete`,
       details: { error: error instanceof Error ? error.message : 'Erro desconhecido' },
-      request
+      request,
+      performedBy: userId || undefined,
+      performedByEmail: userEmail
     });
     
     if (error instanceof Error) {
@@ -428,7 +440,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   const { id } = params;
-  console.log(`DELETE /api/reminders/${id} - Removendo lembrete`);
+  console.log(`DELETE /api/reminders/${id} - Excluindo lembrete`);
   
   try {
     // Verificar autenticação
@@ -437,7 +449,8 @@ export async function DELETE(
     
     // Obter dados do usuário atual
     const userId = await getCurrentUserId();
-    const userEmail = (await getServerSession())?.user?.email || '';
+    const userEmail = (await getServerSession(authOptions))?.user?.email || '';
+    const userRole = await getCurrentUserRole();
     
     console.log('Conectando ao banco de dados...');
     await dbConnect();
@@ -456,7 +469,7 @@ export async function DELETE(
         entityId: id,
         description: `Tentativa de excluir lembrete inexistente`,
         request,
-        performedById: userId,
+        performedBy: userId || undefined,
         performedByEmail: userEmail
       });
       
@@ -467,9 +480,6 @@ export async function DELETE(
     }
     
     // Verificar permissões - usuários comuns só podem excluir seus próprios lembretes
-    const userId = await getCurrentUserId();
-    const userRole = await getCurrentUserRole();
-    
     if (userRole === 'user' && reminder.createdBy && reminder.createdBy.toString() !== userId) {
       console.log(`Acesso negado: Usuário ${userId} tentando excluir lembrete de outro usuário`);
       return NextResponse.json(
@@ -535,7 +545,7 @@ export async function DELETE(
     
     // Registrar atividade de exclusão do lembrete
     await logReminderDeletion(
-      reminder as Reminder,
+      reminder as unknown as ReminderType,
       userId as string,
       userEmail as string,
       request
@@ -546,6 +556,17 @@ export async function DELETE(
   } catch (error) {
     console.error(`Erro ao remover lembrete ${id}:`, error);
     
+    // Obter dados do usuário para o log
+    let userId = 'sistema';
+    let userEmail = 'sistema@sistema.com';
+    
+    try {
+      userId = await getCurrentUserId() || 'sistema';
+      userEmail = (await getServerSession(authOptions))?.user?.email || 'sistema@sistema.com';
+    } catch (e) {
+      console.error('Erro ao obter dados do usuário para log:', e);
+    }
+    
     // Registrar erro no processo de exclusão
     await logActivity({
       action: 'delete',
@@ -553,7 +574,9 @@ export async function DELETE(
       entityId: id,
       description: `Erro ao processar exclusão de lembrete`,
       details: { error: error instanceof Error ? error.message : 'Erro desconhecido' },
-      request
+      request,
+      performedBy: userId || undefined,
+      performedByEmail: userEmail
     });
     
     if (error instanceof Error) {

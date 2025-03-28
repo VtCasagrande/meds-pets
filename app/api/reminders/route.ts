@@ -3,10 +3,11 @@ import dbConnect from '@/app/lib/db';
 import Reminder from '@/app/lib/models/Reminder';
 import { WebhookPayload } from '@/app/lib/types';
 import { Types } from 'mongoose';
-import { getCurrentUserId, getCurrentUserRole, requireAuth } from '@/app/lib/auth';
+import { getCurrentUserId, getCurrentUserRole, requireAuth, authOptions } from '@/app/lib/auth';
 import { logActivity } from '@/app/lib/services/auditLogService';
 import { getServerSession } from 'next-auth';
 import { logReminderCreation } from '@/app/lib/logHelpers';
+import { Reminder as ReminderType } from '@/app/lib/types';
 
 // Importar funções do schedulerService apenas em ambiente Node.js
 let scheduleReminderNotifications: (reminder: any, webhookUrl?: string, webhookSecret?: string) => Promise<void> = 
@@ -144,8 +145,8 @@ export async function GET(request: NextRequest) {
     const userRole = await getCurrentUserRole();
     
     // Definir filtros com base no papel do usuário
-    let activeFilter = { isActive: true };
-    let completedFilter = { isActive: false };
+    let activeFilter: any = { isActive: true };
+    let completedFilter: any = { isActive: false };
     
     // Usuários comuns só veem seus próprios lembretes
     if (userRole === 'user' && userId) {
@@ -206,7 +207,7 @@ export async function POST(request: NextRequest) {
     
     // Obter ID do usuário atual para armazenar como criador
     const userId = await getCurrentUserId();
-    const userEmail = (await getServerSession())?.user?.email || '';
+    const userEmail = (await getServerSession(authOptions))?.user?.email || '';
     
     // Extrair a URL e chave secreta do webhook, se fornecidas
     // Ou usar as configurações de ambiente como fallback
@@ -262,7 +263,7 @@ export async function POST(request: NextRequest) {
       
       // Registrar log de auditoria para criação de lembrete
       await logReminderCreation(
-        reminder as Reminder, 
+        reminder as unknown as ReminderType, 
         userId as string, 
         userEmail as string, 
         request
@@ -312,7 +313,7 @@ export async function POST(request: NextRequest) {
         description: 'Erro ao criar lembrete',
         details: { error: dbError.message || 'Erro desconhecido' },
         request,
-        performedById: userId,
+        performedBy: userId || undefined,
         performedByEmail: userEmail
       });
       
@@ -341,13 +342,26 @@ export async function POST(request: NextRequest) {
       console.error('Stack trace:', error.stack);
     }
     
+    // Obter dados do usuário para o log
+    let userId = 'sistema';
+    let userEmail = 'sistema@sistema.com';
+    
+    try {
+      userId = await getCurrentUserId() || 'sistema';
+      userEmail = (await getServerSession(authOptions))?.user?.email || 'sistema@sistema.com';
+    } catch (e) {
+      console.error('Erro ao obter dados do usuário para log:', e);
+    }
+    
     // Registrar log de erro
     await logActivity({
       action: 'create',
       entity: 'reminder',
       description: 'Erro ao processar criação de lembrete',
       details: { error: error instanceof Error ? error.message : 'Erro desconhecido' },
-      request
+      request,
+      performedBy: userId || undefined,
+      performedByEmail: userEmail
     });
     
     return NextResponse.json(

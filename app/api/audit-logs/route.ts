@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/lib/auth';
-import { connect } from '@/app/lib/mongodb';
+import dbConnect from '@/app/lib/db';
 import { ObjectId } from 'mongodb';
 import { getAuditLogs, logActivity } from '@/app/lib/services/auditLogService';
 import { requireAdmin } from '@/app/lib/auth';
+import AuditLog from '@/app/lib/models/AuditLog';
 
 // GET /api/audit-logs - Listar logs de auditoria com filtros e paginação
 export async function GET(request: NextRequest) {
@@ -27,7 +28,7 @@ export async function GET(request: NextRequest) {
   }
   
   try {
-    const { db } = await connect();
+    await dbConnect();
     
     // Obter parâmetros de consulta
     const searchParams = request.nextUrl.searchParams;
@@ -35,79 +36,38 @@ export async function GET(request: NextRequest) {
     // Paginação
     const page = parseInt(searchParams.get('page') || '1');
     const limit = 25; // Registros por página
-    const skip = (page - 1) * limit;
     
     // Filtros
-    const entity = searchParams.get('entity');
-    const action = searchParams.get('action');
-    const email = searchParams.get('email');
-    const startDate = searchParams.get('startDate');
-    const endDate = searchParams.get('endDate');
+    const entity = searchParams.get('entity') || undefined;
+    const action = searchParams.get('action') || undefined;
+    const email = searchParams.get('email') || undefined;
+    const startDate = searchParams.get('startDate') ? new Date(searchParams.get('startDate')!) : undefined;
+    const endDate = searchParams.get('endDate') ? new Date(searchParams.get('endDate')!) : undefined;
     
-    // Construir query de filtro
-    const filter: any = {};
-    
-    if (entity) {
-      filter.entity = entity;
-    }
-    
-    if (action) {
-      filter.action = action;
-    }
-    
-    if (email) {
-      filter.performedByEmail = { $regex: email, $options: 'i' }; // Case insensitive
-    }
-    
-    // Filtro de período (data)
-    if (startDate || endDate) {
-      filter.createdAt = {};
-      
-      if (startDate) {
-        filter.createdAt.$gte = new Date(startDate);
-      }
-      
-      if (endDate) {
-        // Adicionar 1 dia para incluir todo o dia final
-        const endDateObj = new Date(endDate);
-        endDateObj.setDate(endDateObj.getDate() + 1);
-        filter.createdAt.$lt = endDateObj;
-      }
-    }
-    
-    // Obter total de registros para a paginação
-    const total = await db.collection('auditLogs').countDocuments(filter);
-    
-    // Obter logs com paginação e ordenados por data de criação (mais recentes primeiro)
-    const logs = await db
-      .collection('auditLogs')
-      .find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .toArray();
-    
-    // Calcular informações de paginação
-    const totalPages = Math.ceil(total / limit);
-    const hasNextPage = page < totalPages;
-    const hasPrevPage = page > 1;
+    // Usar a função getAuditLogs para obter os logs
+    const result = await getAuditLogs({
+      page,
+      limit,
+      entity,
+      action,
+      performedByEmail: email,
+      startDate,
+      endDate,
+      sortDirection: 'desc'
+    });
     
     // Retornar resultados formatados
     return NextResponse.json({
-      logs: logs.map(log => ({
-        ...log,
-        _id: log._id.toString(),
-        // Garantir que entityId seja string se existir
-        entityId: log.entityId ? log.entityId.toString() : undefined
-      })),
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages,
-        hasNextPage,
-        hasPrevPage
-      }
+      logs: result.logs.map(log => {
+        const logObj = log.toObject ? log.toObject() : log;
+        return {
+          ...logObj,
+          _id: logObj._id?.toString() || '',
+          // Garantir que entityId seja string se existir
+          entityId: logObj.entityId ? logObj.entityId.toString() : undefined
+        }
+      }),
+      pagination: result.pagination
     });
   } catch (error) {
     console.error('Erro ao buscar logs de auditoria:', error);
