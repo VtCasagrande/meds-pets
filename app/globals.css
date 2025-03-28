@@ -3,22 +3,65 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
+  --foreground-rgb: 107, 75, 62;
+  --background-start-rgb: 248, 244, 249;
   --background-end-rgb: 255, 255, 255;
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: white;
+@layer base {
+  body {
+    @apply bg-neutral text-dark;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-medium text-dark-dark;
+  }
+  
+  h1 {
+    @apply text-3xl mb-6;
+  }
+  
+  h2 {
+    @apply text-2xl mb-4;
+  }
+  
+  h3 {
+    @apply text-xl mb-3;
+  }
 }
 
 @layer components {
+  .btn {
+    @apply py-2 px-4 rounded-lg font-medium transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+  
   .btn-primary {
-    @apply py-2 px-4 bg-blue-500 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-opacity-75;
+    @apply btn bg-primary text-white shadow-soft hover:bg-primary-dark focus:ring-primary;
   }
+  
+  .btn-secondary {
+    @apply btn bg-secondary text-white shadow-soft hover:bg-secondary-dark focus:ring-secondary;
+  }
+  
+  .btn-accent {
+    @apply btn bg-accent text-white shadow-soft hover:bg-accent-dark focus:ring-accent;
+  }
+  
+  .btn-outline {
+    @apply btn bg-transparent border-2 border-primary text-primary hover:bg-primary hover:text-white focus:ring-primary;
+  }
+  
   .input-field {
-    @apply mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400
-    focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500;
+    @apply block w-full px-3 py-2 bg-white border border-neutral-dark rounded-lg text-sm shadow-soft placeholder-gray-400
+    focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary;
   }
+  
+  .card {
+    @apply bg-white p-6 rounded-xl shadow-card border border-neutral-dark;
+  }
+}
+
+/* Transições suaves */
+* {
+  @apply transition-colors duration-200 ease-in-out;
 } 

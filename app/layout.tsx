@@ -19,14 +19,15 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={inter.className}>
-        <div className="min-h-screen flex flex-col">
+        <div className="min-h-screen flex flex-col bg-neutral">
           <Navbar />
-          <main className="container mx-auto py-6 px-6 flex-grow">
+          <main className="container mx-auto py-8 px-4 md:px-6 flex-grow">
             {children}
           </main>
-          <footer className="bg-gray-100 py-4">
-            <div className="container mx-auto px-6 text-center text-gray-500 text-sm">
-              &copy; {new Date().getFullYear()} Sistema de Lembretes de Medicamentos
+          <footer className="border-t border-neutral-dark py-6">
+            <div className="container mx-auto px-4 md:px-6 text-center text-dark-light text-sm">
+              <p>&copy; {new Date().getFullYear()} Sistema de Lembretes de Medicamentos para Pets</p>
+              <p className="mt-1 text-xs">Cuidando com carinho da saúde dos seus companheiros</p>
             </div>
           </footer>
         </div>

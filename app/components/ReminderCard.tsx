@@ -10,34 +10,43 @@ interface ReminderCardProps {
 
 export default function ReminderCard({ reminder }: ReminderCardProps) {
   const statusClass = reminder.isActive 
-    ? 'bg-green-100 text-green-800' 
-    : 'bg-gray-100 text-gray-800';
+    ? 'bg-primary-light/20 text-primary-dark' 
+    : 'bg-neutral-dark/20 text-dark';
   
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
-      <div className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <h3 className="text-lg font-bold">{reminder.petName}</h3>
-          <span className={`px-2 py-1 rounded text-xs font-medium ${statusClass}`}>
+    <div className="card hover:shadow-card transition-shadow">
+      <div className="mb-4">
+        <div className="flex justify-between items-start mb-3">
+          <h3 className="text-lg font-semibold">{reminder.petName}</h3>
+          <span className={`px-2 py-1 rounded-lg text-xs font-medium ${statusClass}`}>
             {reminder.isActive ? 'Ativo' : 'Finalizado'}
           </span>
         </div>
         
-        <div className="space-y-2 text-sm">
-          <p><span className="font-medium">Tutor:</span> {reminder.tutorName}</p>
-          <p><span className="font-medium">Raça:</span> {reminder.petBreed}</p>
-          <p><span className="font-medium">Telefone:</span> {reminder.phoneNumber}</p>
+        <div className="space-y-3 text-sm">
+          <p className="flex items-center">
+            <span className="font-medium w-20">Tutor:</span> 
+            <span>{reminder.tutorName}</span>
+          </p>
+          <p className="flex items-center">
+            <span className="font-medium w-20">Raça:</span> 
+            <span>{reminder.petBreed}</span>
+          </p>
+          <p className="flex items-center">
+            <span className="font-medium w-20">Telefone:</span> 
+            <span>{reminder.phoneNumber}</span>
+          </p>
           
-          <div className="mt-3">
-            <p className="font-medium mb-1">Medicamentos:</p>
-            <ul className="list-disc pl-5 space-y-1">
+          <div className="mt-4">
+            <p className="font-medium mb-2">Medicamentos:</p>
+            <ul className="space-y-3">
               {reminder.medicationProducts.map((product, index) => (
-                <li key={index}>
-                  <div className="font-medium">{product.title}</div>
-                  <div className="text-xs text-gray-600">
-                    Quantidade: {product.quantity} | 
-                    Frequência: {product.frequency} | 
-                    Início: {formatDate(product.startDateTime)}
+                <li key={index} className="bg-neutral/50 p-3 rounded-lg">
+                  <div className="font-medium text-primary-dark">{product.title}</div>
+                  <div className="text-xs text-dark-light mt-1 space-y-1">
+                    <div><span className="font-medium">Quantidade:</span> {product.quantity}</div>
+                    <div><span className="font-medium">Frequência:</span> {product.frequency}</div>
+                    <div><span className="font-medium">Início:</span> {formatDate(product.startDateTime)}</div>
                   </div>
                 </li>
               ))}
@@ -45,17 +54,17 @@ export default function ReminderCard({ reminder }: ReminderCardProps) {
           </div>
           
           {reminder.createdAt && (
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs text-dark-light mt-3">
               Criado {formatRelativeDate(reminder.createdAt)}
             </p>
           )}
         </div>
       </div>
       
-      <div className="bg-gray-50 px-4 py-3 border-t border-gray-200">
+      <div className="mt-auto pt-3 border-t border-neutral-dark flex justify-end">
         <Link 
           href={`/reminders/${reminder._id || reminder.id}`} 
-          className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+          className="btn-primary text-xs px-3 py-1"
         >
           Ver detalhes
         </Link>
