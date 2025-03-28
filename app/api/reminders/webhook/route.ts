@@ -78,9 +78,9 @@ export async function POST(request: NextRequest) {
         title: medicationProduct.title,
         quantity: medicationProduct.quantity,
         frequencyValue: medicationProduct.frequencyValue || 0,
-        frequencyUnit: medicationProduct.frequencyUnit || 'horas',
+        frequencyUnit: (medicationProduct.frequencyUnit as 'minutos' | 'horas' | 'dias') || 'horas',
         duration: medicationProduct.duration || 0,
-        durationUnit: medicationProduct.durationUnit || 'dias',
+        durationUnit: (medicationProduct.durationUnit as 'dias' | 'semanas' | 'meses') || 'dias',
         startDateTime: medicationProduct.startDateTime ? new Date(medicationProduct.startDateTime).toISOString() : '',
         endDateTime: medicationProduct.endDateTime ? new Date(medicationProduct.endDateTime).toISOString() : ''
       }
