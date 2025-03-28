@@ -262,18 +262,26 @@ export async function POST(
         createdAt: reminderObj.createdAt?.toISOString() || new Date().toISOString(),
         updatedAt: reminderObj.updatedAt?.toISOString() || new Date().toISOString(),
         // Converter cada medicationProduct para garantir que todos os campos obrigatórios estão presentes
-        medicationProducts: reminderObj.medicationProducts.map(product => ({
-          id: product._id?.toString(),
-          title: product.title,
-          quantity: product.quantity,
-          frequency: product.frequency,
-          frequencyValue: product.frequencyValue || 8, // Valor padrão se indefinido
-          frequencyUnit: (product.frequencyUnit as 'minutos' | 'horas' | 'dias') || 'horas',
-          duration: product.duration || 7, // Valor padrão se indefinido
-          durationUnit: (product.durationUnit as 'dias' | 'semanas' | 'meses') || 'dias',
-          startDateTime: product.startDateTime?.toISOString() || new Date().toISOString(),
-          endDateTime: product.endDateTime?.toISOString()
-        }))
+        medicationProducts: reminderObj.medicationProducts.map(product => {
+          // Tentar acessar _id de forma segura para documentos do MongoDB
+          const productId = typeof product === 'object' && product !== null ? 
+            // @ts-ignore - MongoDB adiciona _id que não está no tipo
+            (product._id ? product._id.toString() : product.id) : 
+            undefined;
+            
+          return {
+            id: productId,
+            title: product.title,
+            quantity: product.quantity,
+            frequency: product.frequency,
+            frequencyValue: product.frequencyValue || 8, // Valor padrão se indefinido
+            frequencyUnit: (product.frequencyUnit as 'minutos' | 'horas' | 'dias') || 'horas',
+            duration: product.duration || 7, // Valor padrão se indefinido
+            durationUnit: (product.durationUnit as 'dias' | 'semanas' | 'meses') || 'dias',
+            startDateTime: product.startDateTime?.toISOString() || new Date().toISOString(),
+            endDateTime: product.endDateTime?.toISOString()
+          };
+        })
       };
       
       // Reagendar com as novas configurações
