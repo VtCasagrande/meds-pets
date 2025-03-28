@@ -1,10 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import Reminder from '@/app/lib/models/Reminder';
+import { Reminder as ReminderType } from '@/app/lib/types';
+import { Types } from 'mongoose';
 
 interface UpdateWebhooksRequest {
   webhookUrl: string;
   webhookSecret?: string;
+}
+
+// Interface que estende o tipo do Reminder para incluir os tipos do MongoDB
+interface ReminderDocument {
+  _id: Types.ObjectId;
+  tutorName: string;
+  petName: string;
+  petBreed: string;
+  phoneNumber: string;
+  isActive: boolean;
+  webhookUrl?: string;
+  webhookSecret?: string;
+  medicationProducts: Array<{
+    id?: string;
+    title: string;
+    quantity: string;
+    frequency: string;
+    frequencyValue?: number;
+    frequencyUnit?: string;
+    duration?: number;
+    durationUnit?: string;
+    startDateTime: Date;
+    endDateTime?: Date;
+  }>;
 }
 
 export async function POST(request: NextRequest) {
@@ -43,7 +69,7 @@ export async function POST(request: NextRequest) {
       const schedulerServicePromise = import('@/app/lib/services/schedulerService').then(module => module);
       
       // Buscar lembretes ativos atualizados
-      const reminders = await Reminder.find({ isActive: true });
+      const reminders = await Reminder.find({ isActive: true }) as ReminderDocument[];
       
       // Aguardar importação dinâmica
       const schedulerService = await schedulerServicePromise;
