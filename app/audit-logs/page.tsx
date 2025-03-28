@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -35,7 +35,8 @@ interface LogsResponse {
   };
 }
 
-export default function AuditLogsPage() {
+// Componente principal que usa useSearchParams dentro de Suspense
+function AuditLogsContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -403,5 +404,18 @@ export default function AuditLogsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Componente wrapper com Suspense boundary
+export default function AuditLogsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex justify-center items-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    }>
+      <AuditLogsContent />
+    </Suspense>
   );
 } 

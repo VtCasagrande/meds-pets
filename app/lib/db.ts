@@ -77,7 +77,8 @@ async function dbConnect() {
   // Se ainda não temos uma promessa de conexão, criá-la
   if (!cached.promise) {
     const opts = {
-      bufferCommands: false,
+      // Remover a opção bufferCommands que está causando erros
+      // bufferCommands: false,
       // Adicionar retry e timeout
       serverSelectionTimeoutMS: 30000, // Aumentado para 30s
       socketTimeoutMS: 60000, // 60s
