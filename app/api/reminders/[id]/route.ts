@@ -158,6 +158,9 @@ export async function PUT(
     if (updatedReminder && updatedReminder.medicationProducts.length > 0) {
       const firstProduct = updatedReminder.medicationProducts[0];
       
+      // Verificar se o lembrete foi desativado
+      const isDeactivation = existingReminder.isActive === true && updatedReminder.isActive === false;
+      
       // Preparar payload do webhook
       const webhookPayload: WebhookPayload = {
         reminderId: updatedReminder._id ? updatedReminder._id.toString() : id,
@@ -165,8 +168,10 @@ export async function PUT(
         petName: updatedReminder.petName,
         petBreed: updatedReminder.petBreed || '',
         phoneNumber: updatedReminder.phoneNumber,
-        eventType: 'reminder_updated',
-        eventDescription: 'Lembrete atualizado',
+        eventType: isDeactivation ? 'reminder_deactivated' : 'reminder_updated',
+        eventDescription: isDeactivation 
+          ? `Lembrete para ${updatedReminder.petName} foi desativado` 
+          : 'Lembrete atualizado',
         medicationProduct: {
           title: firstProduct.title,
           quantity: firstProduct.quantity,
@@ -231,6 +236,44 @@ export async function DELETE(
     // Remover agendamentos existentes antes de excluir o lembrete
     console.log(`Removendo agendamentos para lembrete ${id}...`);
     removeReminderNotifications(id);
+    
+    // Enviar webhook de exclusão
+    console.log(`Enviando webhook para notificar exclusão do lembrete ${id}...`);
+    
+    // Obter configurações de webhook
+    const webhookUrl = process.env.WEBHOOK_URL || '';
+    const webhookSecret = process.env.WEBHOOK_SECRET || '';
+    
+    if (webhookUrl) {
+      // Caso seja necessário enviar webhook de exclusão
+      const firstProduct = reminder.medicationProducts && reminder.medicationProducts.length > 0 
+        ? reminder.medicationProducts[0] 
+        : null;
+      
+      if (firstProduct) {
+        const webhookPayload: WebhookPayload = {
+          reminderId: id,
+          tutorName: reminder.tutorName,
+          petName: reminder.petName,
+          petBreed: reminder.petBreed || '',
+          phoneNumber: reminder.phoneNumber,
+          eventType: 'reminder_deleted',
+          eventDescription: `Lembrete para ${reminder.petName} foi excluído`,
+          medicationProduct: {
+            title: firstProduct.title,
+            quantity: firstProduct.quantity,
+            frequencyValue: firstProduct.frequencyValue || 0,
+            frequencyUnit: firstProduct.frequencyUnit || 'horas',
+            duration: firstProduct.duration || 0,
+            durationUnit: firstProduct.durationUnit || 'dias',
+            startDateTime: firstProduct.startDateTime ? firstProduct.startDateTime.toISOString() : '',
+            endDateTime: firstProduct.endDateTime ? firstProduct.endDateTime.toISOString() : ''
+          }
+        };
+        
+        await sendWebhook(webhookPayload, webhookUrl, webhookSecret);
+      }
+    }
     
     console.log(`Excluindo lembrete ${id}...`);
     await Reminder.findByIdAndDelete(id);

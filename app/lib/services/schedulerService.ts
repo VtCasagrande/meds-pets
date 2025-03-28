@@ -35,6 +35,84 @@ function formatDateSafe(date: any): string {
   return '';
 }
 
+// Verificar lembretes finalizados diariamente
+async function checkAllCompletedReminders() {
+  if (!isNodeEnvironment) {
+    return;
+  }
+  
+  try {
+    console.log('Verificando lembretes concluídos...');
+    
+    // Importar modelo do Mongoose dinamicamente
+    const dbConnectPromise = import('../db').then(module => module.default);
+    const ReminderModelPromise = import('../models/Reminder').then(module => module.default);
+    
+    // Aguardar importações dinâmicas
+    const [dbConnect, ReminderModel] = await Promise.all([dbConnectPromise, ReminderModelPromise]);
+    
+    // Conectar ao banco de dados
+    await dbConnect();
+    
+    // Buscar todos os lembretes ativos
+    const activeReminders = await ReminderModel.find({ isActive: true });
+    
+    console.log(`Encontrados ${activeReminders.length} lembretes ativos para verificar.`);
+    
+    // Obter configurações de webhook
+    const webhookUrl = process.env.WEBHOOK_URL || '';
+    const webhookSecret = process.env.WEBHOOK_SECRET || '';
+    
+    // Verificar cada lembrete
+    for (const reminderDoc of activeReminders) {
+      const reminder: Reminder = {
+        id: reminderDoc._id ? reminderDoc._id.toString() : '',
+        _id: reminderDoc._id ? reminderDoc._id.toString() : '',
+        tutorName: reminderDoc.tutorName,
+        petName: reminderDoc.petName,
+        petBreed: reminderDoc.petBreed || '',
+        phoneNumber: reminderDoc.phoneNumber,
+        isActive: reminderDoc.isActive,
+        medicationProducts: reminderDoc.medicationProducts.map(product => {
+          // Garantir que frequencyUnit seja um valor válido
+          let frequencyUnit: 'minutos' | 'horas' | 'dias' = 'horas';
+          if (product.frequencyUnit === 'minutos' || product.frequencyUnit === 'horas' || product.frequencyUnit === 'dias') {
+            frequencyUnit = product.frequencyUnit;
+          }
+          
+          // Garantir que durationUnit seja um valor válido
+          let durationUnit: 'dias' | 'semanas' | 'meses' = 'dias';
+          if (product.durationUnit === 'dias' || product.durationUnit === 'semanas' || product.durationUnit === 'meses') {
+            durationUnit = product.durationUnit;
+          }
+          
+          return {
+            id: product.id || undefined,
+            title: product.title,
+            quantity: product.quantity,
+            frequency: product.frequency || '',
+            frequencyValue: product.frequencyValue || 0,
+            frequencyUnit: frequencyUnit,
+            duration: product.duration || 0,
+            durationUnit: durationUnit,
+            startDateTime: formatDateSafe(product.startDateTime),
+            endDateTime: formatDateSafe(product.endDateTime)
+          };
+        }),
+        createdAt: formatDateSafe(reminderDoc.createdAt),
+        updatedAt: formatDateSafe(reminderDoc.updatedAt)
+      };
+      
+      // Verificar se todos os tratamentos foram concluídos
+      await checkReminderCompletion(reminder, webhookUrl, webhookSecret);
+    }
+    
+    console.log('Verificação de lembretes concluídos finalizada.');
+  } catch (error) {
+    console.error('Erro ao verificar lembretes concluídos:', error);
+  }
+}
+
 // Iniciar o agendador
 export function startScheduler() {
   // Verificar se estamos em ambiente de servidor (não Edge)
@@ -52,6 +130,12 @@ export function startScheduler() {
   // Verificar tarefas a cada 30 segundos
   // Em produção, este intervalo seria ajustado conforme necessário
   schedulerInterval = setInterval(checkScheduledTasks, 30 * 1000);
+  
+  // Verificar lembretes concluídos uma vez ao iniciar
+  checkAllCompletedReminders();
+  
+  // E depois diariamente (a cada 24 horas)
+  setInterval(checkAllCompletedReminders, 24 * 60 * 60 * 1000);
   
   console.log('Serviço de agendamento iniciado.');
 }
@@ -141,6 +225,9 @@ async function executeTask(task: ScheduledTask) {
     
     // Agendar próxima notificação se necessário
     scheduleNextNotification(reminder, task.medicationIndex, task.webhookUrl, task.webhookSecret);
+    
+    // Verificar se todos os tratamentos foram concluídos
+    await checkReminderCompletion(reminder, task.webhookUrl, task.webhookSecret);
   } catch (error) {
     console.error(`Erro ao executar tarefa ${task.id}:`, error);
   }
@@ -393,4 +480,86 @@ export function listScheduledTasks() {
     medicationIndex: task.medicationIndex,
     scheduledTime: task.scheduledTime.toISOString()
   }));
+}
+
+// Verificar se todos os tratamentos foram concluídos
+async function checkReminderCompletion(reminder: Reminder, webhookUrl?: string, webhookSecret?: string) {
+  if (!reminder.isActive) {
+    return; // Já está inativo
+  }
+  
+  const now = new Date();
+  let allTreatmentsFinished = true;
+  
+  // Verificar se todos os tratamentos têm data de término e se já passaram
+  for (const product of reminder.medicationProducts) {
+    if (!product.endDateTime) {
+      allTreatmentsFinished = false;
+      break;
+    }
+    
+    const endDate = new Date(product.endDateTime);
+    if (endDate > now) {
+      allTreatmentsFinished = false;
+      break;
+    }
+  }
+  
+  // Se todos os tratamentos foram concluídos, marcar lembrete como inativo e enviar webhook
+  if (allTreatmentsFinished && reminder.medicationProducts.length > 0) {
+    console.log(`Todos os tratamentos do lembrete ${reminder.id || reminder._id} foram concluídos.`);
+    
+    try {
+      // Importar modelo do Mongoose dinamicamente para evitar problemas de SSR/Edge
+      const dbConnectPromise = import('../db').then(module => module.default);
+      const ReminderModelPromise = import('../models/Reminder').then(module => module.default);
+      
+      // Aguardar importações dinâmicas
+      const [dbConnect, ReminderModel] = await Promise.all([dbConnectPromise, ReminderModelPromise]);
+      
+      // Conectar ao banco de dados
+      await dbConnect();
+      
+      // Atualizar lembrete para inativo
+      await ReminderModel.findByIdAndUpdate(
+        reminder.id || reminder._id,
+        { isActive: false, updatedAt: new Date() }
+      );
+      
+      console.log(`Lembrete ${reminder.id || reminder._id} marcado como inativo.`);
+      
+      // Enviar webhook de finalização
+      if (webhookUrl) {
+        const firstProduct = reminder.medicationProducts[0];
+        
+        const webhookPayload: WebhookPayload = {
+          reminderId: reminder.id || reminder._id || '',
+          tutorName: reminder.tutorName,
+          petName: reminder.petName,
+          petBreed: reminder.petBreed || '',
+          phoneNumber: reminder.phoneNumber,
+          eventType: 'reminder_finished',
+          eventDescription: `Todos os tratamentos para ${reminder.petName} foram concluídos`,
+          medicationProduct: {
+            title: firstProduct.title,
+            quantity: firstProduct.quantity,
+            frequencyValue: firstProduct.frequencyValue || 0,
+            frequencyUnit: firstProduct.frequencyUnit || 'horas',
+            duration: firstProduct.duration || 0,
+            durationUnit: firstProduct.durationUnit || 'dias',
+            startDateTime: formatDateSafe(firstProduct.startDateTime),
+            endDateTime: formatDateSafe(firstProduct.endDateTime)
+          }
+        };
+        
+        await sendWebhook(webhookPayload, webhookUrl, webhookSecret);
+        console.log(`Webhook de finalização enviado para lembrete ${reminder.id || reminder._id}`);
+      }
+      
+      // Remover todas as notificações agendadas
+      removeReminderNotifications(reminder.id || reminder._id || '');
+    } catch (error) {
+      console.error(`Erro ao marcar lembrete ${reminder.id || reminder._id} como inativo:`, error);
+    }
+  }
 }
