@@ -229,9 +229,9 @@ export async function POST(request: NextRequest) {
             title: firstProduct.title,
             quantity: firstProduct.quantity,
             frequencyValue: firstProduct.frequencyValue || 0,
-            frequencyUnit: firstProduct.frequencyUnit || 'horas',
+            frequencyUnit: (firstProduct.frequencyUnit as 'minutos' | 'horas' | 'dias') || 'horas',
             duration: firstProduct.duration || 0,
-            durationUnit: firstProduct.durationUnit || 'dias',
+            durationUnit: (firstProduct.durationUnit as 'dias' | 'semanas' | 'meses') || 'dias',
             startDateTime: firstProduct.startDateTime ? firstProduct.startDateTime.toISOString() : '',
             endDateTime: firstProduct.endDateTime ? firstProduct.endDateTime.toISOString() : ''
           }
