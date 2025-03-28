@@ -249,234 +249,273 @@ export default function MedicationProductForm({
   ) => {
     const { name, value } = e.target;
     
-    setProduct((prev) => {
-      // Converter valores numéricos
-      if (name === 'frequencyValue' || name === 'duration') {
-        return { ...prev, [name]: Number(value) };
-      }
+    // Tratamento especial para campos numéricos
+    if (name === 'frequencyValue' || name === 'duration') {
+      const numValue = parseInt(value);
+      setProduct({ ...product, [name]: isNaN(numValue) ? 0 : numValue });
+      // Força recálculo após alterar valores importantes
+      setTimeout(forceRecalculation, 100);
+    } else {
+      setProduct({ ...product, [name]: value });
       
-      // Se o campo alterado for relacionado à frequência, vamos garantir
-      // que a data de término seja recalculada
-      if (name === 'frequencyValue' || name === 'frequencyUnit') {
-        // Programar um recálculo forçado
-        setTimeout(() => forceRecalculation(), 0);
+      // Para os campos que afetam o cálculo das datas, forçar recálculo
+      if (['frequencyUnit', 'durationUnit', 'startDateTime'].includes(name)) {
+        setTimeout(forceRecalculation, 100);
       }
-      
-      return { ...prev, [name]: value };
-    });
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    e.stopPropagation();
-    
-    if (!product.title || !product.quantity || !product.startDateTime) {
-      alert('Por favor, preencha todos os campos do medicamento.');
-      return;
-    }
-    
-    // Garantir que a data final está atualizada antes de enviar
-    const updatedEndDate = calculateEndDate(
-      product.startDateTime, 
-      product.duration, 
-      product.durationUnit,
-      product.frequencyValue,
-      product.frequencyUnit
-    );
-    
-    const finalProduct = {
-      ...product,
-      endDateTime: updatedEndDate
-    };
-    
-    console.log('Enviando medicamento:', finalProduct);
-    onAdd(finalProduct);
-    
-    if (!initialData) {
-      setProduct({
-        title: '',
-        quantity: '',
-        frequency: '',
-        frequencyValue: 8,
-        frequencyUnit: 'horas',
-        duration: 7,
-        durationUnit: 'dias',
-        startDateTime: new Date().toISOString().slice(0, 16),
-        endDateTime: ''
-      });
-    }
+    onAdd(product);
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-md border border-gray-200">
-      <h3 className="font-bold text-lg mb-4">
-        {initialData ? 'Editar Medicamento' : 'Adicionar Medicamento'}
+    <div className="card">
+      <h3 className="font-semibold text-xl mb-6">
+        {initialData ? 'Editar Medicamento' : 'Adicionar Novo Medicamento'}
       </h3>
       
-      <div>
-        <div className="mb-4">
-          <label htmlFor="title" className="block text-sm font-medium text-gray-700">
-            Nome do Medicamento
-          </label>
-          <input
-            type="text"
-            id="title"
-            name="title"
-            required
-            value={product.title}
-            onChange={handleChange}
-            className="input-field"
-            placeholder="Ex: Antibiótico Amoxicilina"
-          />
-        </div>
-        
-        <div className="mb-4">
-          <label htmlFor="quantity" className="block text-sm font-medium text-gray-700">
-            Quantidade/Dosagem
-          </label>
-          <input
-            type="text"
-            id="quantity"
-            name="quantity"
-            required
-            value={product.quantity}
-            onChange={handleChange}
-            className="input-field"
-            placeholder="Ex: 1 comprimido, 10ml, etc."
-          />
-        </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Frequência
-          </label>
-          <div className="flex space-x-2">
-            <div className="w-1/3">
-              <input
-                type="number"
-                id="frequencyValue"
-                name="frequencyValue"
-                min="1"
-                required
-                value={product.frequencyValue}
-                onChange={handleChange}
-                className="input-field"
-              />
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Nome do Medicamento */}
+          <div className="col-span-2">
+            <label className="block text-dark-dark text-sm font-medium mb-2" htmlFor="title">
+              Nome do Medicamento
+            </label>
+            <input
+              type="text"
+              id="title"
+              name="title"
+              value={product.title}
+              onChange={handleChange}
+              className="input-field"
+              placeholder="Ex: Amoxicilina, Vermífugo, etc."
+              required
+            />
+          </div>
+          
+          {/* Quantidade/Dosagem */}
+          <div className="col-span-2 md:col-span-1">
+            <label className="block text-dark-dark text-sm font-medium mb-2" htmlFor="quantity">
+              Dosagem
+            </label>
+            <input
+              type="text"
+              id="quantity"
+              name="quantity"
+              value={product.quantity}
+              onChange={handleChange}
+              className="input-field"
+              placeholder="Ex: 1 comprimido, 5ml, etc."
+              required
+            />
+          </div>
+          
+          {/* Frequência - Novo formato com dois campos */}
+          <div className="col-span-2 md:col-span-1">
+            <label className="block text-dark-dark text-sm font-medium mb-2">
+              Frequência
+            </label>
+            <div className="flex space-x-2">
+              <div className="flex-1">
+                <input
+                  type="number"
+                  name="frequencyValue"
+                  value={product.frequencyValue}
+                  onChange={handleChange}
+                  className="input-field"
+                  min="1"
+                  required
+                />
+              </div>
+              <div className="w-1/2">
+                <select
+                  name="frequencyUnit"
+                  value={product.frequencyUnit}
+                  onChange={handleChange}
+                  className="input-field"
+                  required
+                >
+                  <option value="horas">horas</option>
+                  <option value="dias">dias</option>
+                  <option value="minutos">minutos</option>
+                </select>
+              </div>
             </div>
-            <div className="w-2/3">
-              <select
-                id="frequencyUnit"
-                name="frequencyUnit"
-                value={product.frequencyUnit}
-                onChange={handleChange}
-                className="input-field"
-              >
-                <option value="minutos">Minutos</option>
-                <option value="horas">Horas</option>
-                <option value="dias">Dias</option>
-              </select>
+            <p className="text-xs text-dark-light mt-1">
+              Ex: A cada 8 horas, a cada 12 horas, etc.
+            </p>
+          </div>
+          
+          {/* Data e hora de início */}
+          <div>
+            <label className="block text-dark-dark text-sm font-medium mb-2" htmlFor="startDateTime">
+              Data e Hora de Início
+            </label>
+            <input
+              type="datetime-local"
+              id="startDateTime"
+              name="startDateTime"
+              value={product.startDateTime}
+              onChange={handleChange}
+              className="input-field"
+              required
+            />
+          </div>
+          
+          {/* Duração - Novo formato com dois campos */}
+          <div>
+            <label className="block text-dark-dark text-sm font-medium mb-2">
+              Duração do Tratamento
+            </label>
+            <div className="flex space-x-2">
+              <div className="flex-1">
+                <input
+                  type="number"
+                  name="duration"
+                  value={product.duration}
+                  onChange={handleChange}
+                  className="input-field"
+                  min="1"
+                  required
+                />
+              </div>
+              <div className="w-1/2">
+                <select
+                  name="durationUnit"
+                  value={product.durationUnit}
+                  onChange={handleChange}
+                  className="input-field"
+                  required
+                >
+                  <option value="dias">dias</option>
+                  <option value="semanas">semanas</option>
+                  <option value="meses">meses</option>
+                </select>
+              </div>
             </div>
           </div>
-          <p className="text-sm text-gray-500 mt-1">
-            {product.frequency}
-          </p>
-        </div>
-        
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700">
-            Duração do Tratamento
-          </label>
-          <div className="flex space-x-2">
-            <div className="w-1/3">
-              <input
-                type="number"
-                id="duration"
-                name="duration"
-                min="1"
-                required
-                value={product.duration}
-                onChange={handleChange}
-                className="input-field"
-              />
-            </div>
-            <div className="w-2/3">
-              <select
-                id="durationUnit"
-                name="durationUnit"
-                value={product.durationUnit}
-                onChange={handleChange}
-                className="input-field"
-              >
-                <option value="dias">Dias</option>
-                <option value="semanas">Semanas</option>
-                <option value="meses">Meses</option>
-              </select>
-            </div>
+          
+          {/* Data calculada de término */}
+          <div className="col-span-2">
+            <label className="block text-dark-dark text-sm font-medium mb-2" htmlFor="endDateTime">
+              Data e Hora de Término (calculada automaticamente)
+            </label>
+            <input
+              type="datetime-local"
+              id="endDateTime"
+              name="endDateTime"
+              value={product.endDateTime}
+              className="input-field bg-neutral-dark/10 cursor-not-allowed"
+              disabled
+            />
+            {lastDoseInfo.message && (
+              <p className="text-xs text-accent-dark mt-1">{lastDoseInfo.message}</p>
+            )}
           </div>
         </div>
         
-        <div className="mb-4">
-          <label htmlFor="startDateTime" className="block text-sm font-medium text-gray-700">
-            Data e Hora de Início
-          </label>
-          <input
-            type="datetime-local"
-            id="startDateTime"
-            name="startDateTime"
-            required
-            value={product.startDateTime}
-            onChange={handleChange}
-            className="input-field"
-          />
-        </div>
+        {/* Visualização de doses */}
+        {product.startDateTime && product.endDateTime && (
+          <div className="bg-neutral/50 p-4 rounded-lg mt-6 border border-neutral-dark">
+            <h4 className="font-medium text-sm mb-2">Informações sobre as doses</h4>
+            <MedicationDoseSchedule product={product} />
+          </div>
+        )}
         
-        <div className="mb-4">
-          <label htmlFor="endDateTime" className="block text-sm font-medium text-gray-700">
-            Data de Término (Calculada)
-          </label>
-          <input
-            type="datetime-local"
-            id="endDateTime"
-            name="endDateTime"
-            readOnly
-            value={product.endDateTime || ''}
-            className="input-field bg-gray-100"
-          />
-          {product.endDateTime && (
-            <p className="text-sm text-gray-500 mt-1">
-              Término: {new Date(product.endDateTime).toLocaleString('pt-BR', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              })}
-            </p>
-          )}
-          {lastDoseInfo.message && (
-            <p className="text-sm text-blue-600 mt-1 font-medium border-l-2 border-blue-500 pl-2">
-              {lastDoseInfo.message}
-            </p>
-          )}
-        </div>
-        
-        <div className="flex justify-end space-x-2">
-          <button
-            type="button"
+        {/* Botões de ação */}
+        <div className="flex justify-end space-x-3 pt-4 border-t border-neutral-dark mt-6">
+          <button 
+            type="button" 
             onClick={onCancel}
-            className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
+            className="btn-outline"
           >
             Cancelar
           </button>
-          <button
-            type="button"
-            onClick={handleSubmit}
+          <button 
+            type="submit" 
             className="btn-primary"
           >
-            {initialData ? 'Atualizar' : 'Adicionar'}
+            {initialData ? 'Atualizar' : 'Adicionar'} Medicamento
           </button>
         </div>
+      </form>
+    </div>
+  );
+}
+
+// Componente para mostrar um preview das doses do medicamento
+function MedicationDoseSchedule({ product }: { product: MedicationProduct }) {
+  const { startDateTime, endDateTime, frequencyValue, frequencyUnit } = product;
+  const [doses, setDoses] = useState<Date[]>([]);
+  
+  useEffect(() => {
+    if (startDateTime && endDateTime && frequencyValue) {
+      // Calcular as doses entre o início e o fim
+      const start = new Date(startDateTime);
+      const end = new Date(endDateTime);
+      
+      // Convertendo a frequência para milissegundos
+      let frequencyMs = 0;
+      switch(frequencyUnit) {
+        case 'minutos':
+          frequencyMs = frequencyValue * 60 * 1000;
+          break;
+        case 'horas':
+          frequencyMs = frequencyValue * 60 * 60 * 1000;
+          break;
+        case 'dias':
+          frequencyMs = frequencyValue * 24 * 60 * 60 * 1000;
+          break;
+      }
+      
+      // Gerar array com as datas das doses
+      const doseArray: Date[] = [];
+      let currentDose = new Date(start);
+      
+      while (currentDose <= end) {
+        doseArray.push(new Date(currentDose));
+        currentDose = new Date(currentDose.getTime() + frequencyMs);
+      }
+      
+      // Limitar a 10 doses para visualização
+      setDoses(doseArray.slice(0, 10));
+    }
+  }, [startDateTime, endDateTime, frequencyValue, frequencyUnit]);
+  
+  // Formatar data para exibição
+  const formatDateDisplay = (date: Date) => {
+    return new Intl.DateTimeFormat('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    }).format(date);
+  };
+  
+  // Exibir próximas doses
+  return (
+    <div>
+      <p className="text-xs text-dark-light mb-2">
+        {doses.length > 0 
+          ? `Mostrando ${doses.length} ${doses.length === 1 ? 'dose' : 'doses'}${doses.length === 10 ? ' (primeiras 10)' : ''}`
+          : 'Sem doses para mostrar'}
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-60 overflow-y-auto">
+        {doses.map((dose, index) => (
+          <div key={index} className="text-xs bg-white p-2 rounded border border-neutral-dark">
+            <span className="font-medium text-primary-dark">
+              Dose {index + 1}:
+            </span>{' '}
+            {formatDateDisplay(dose)}
+          </div>
+        ))}
       </div>
+      {doses.length === 10 && (
+        <p className="text-xs text-accent-dark mt-2">Existem mais doses. São exibidas apenas as 10 primeiras.</p>
+      )}
     </div>
   );
 } 
