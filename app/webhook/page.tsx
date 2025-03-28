@@ -328,6 +328,19 @@ export default function WebhookConfigPage() {
             Iniciar Agendador
           </button>
         </div>
+        
+        <div className="mt-4 pt-4 border-t border-gray-200">
+          <h4 className="font-medium mb-2">Integração com GitHub</h4>
+          <p className="text-sm text-gray-600 mb-3">
+            Configure a integração com o GitHub para enviar atualizações a cada frequência de medicamento.
+          </p>
+          <Link 
+            href="/webhook/github" 
+            className="inline-flex items-center px-4 py-2 bg-gray-800 text-white font-medium rounded-md hover:bg-gray-700"
+          >
+            Configurar GitHub
+          </Link>
+        </div>
       </div>
       
       <div className="bg-white rounded-lg shadow-md p-6 border border-gray-200">

@@ -11,6 +11,7 @@ export interface IWebhookLog extends Document {
   statusCode: number;
   response: string;
   success: boolean;
+  isGitHub?: boolean;
   createdAt: Date;
 }
 
@@ -23,6 +24,7 @@ const WebhookLogSchema = new Schema({
   statusCode: { type: Number, required: true },
   response: { type: String },
   success: { type: Boolean, default: false },
+  isGitHub: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now, index: true }
 });
 

@@ -235,13 +235,13 @@ async function executeTask(task: ScheduledTask) {
     
     const medicationProduct = reminder.medicationProducts[task.medicationIndex];
     console.log(`Executando tarefa para medicamento: ${medicationProduct.title}`);
-    console.log(`Detalhes da frequência: ${medicationProduct.frequencyValue} ${medicationProduct.frequencyUnit}`);
+    console.log(`📋 DETALHES DA FREQUÊNCIA: ${medicationProduct.frequencyValue} ${medicationProduct.frequencyUnit}`);
     
     // Obter as configurações de webhook do lembrete ou da tarefa
-    const webhookUrl = reminder.webhookUrl || task.webhookUrl;
-    const webhookSecret = reminder.webhookSecret || task.webhookSecret;
+    const webhookUrl = reminder.webhookUrl || task.webhookUrl || process.env.WEBHOOK_URL;
+    const webhookSecret = reminder.webhookSecret || task.webhookSecret || process.env.WEBHOOK_SECRET;
     
-    console.log(`Configurações de webhook do lembrete - URL: ${webhookUrl || 'não configurada'}, Secret: ${webhookSecret ? 'configurado' : 'não configurado'}`);
+    console.log(`Configurações de webhook - URL: ${webhookUrl || 'não configurada'}, Secret: ${webhookSecret ? 'configurado' : 'não configurado'}`);
     
     // Preparar payload do webhook
     const webhookPayload: WebhookPayload = {
@@ -266,9 +266,13 @@ async function executeTask(task: ScheduledTask) {
     
     // Enviar webhook
     if (webhookUrl) {
-      console.log(`Enviando webhook de notificação para ${webhookUrl}`);
-      await sendWebhook(webhookPayload, webhookUrl, webhookSecret);
-      console.log(`Webhook enviado com sucesso para a frequência ${medicationProduct.frequencyValue} ${medicationProduct.frequencyUnit}`);
+      console.log(`📤 ENVIANDO WEBHOOK para a frequência ${medicationProduct.frequencyValue} ${medicationProduct.frequencyUnit}`);
+      const result = await sendWebhook(webhookPayload, webhookUrl, webhookSecret);
+      if (result && result.success) {
+        console.log(`✅ Webhook enviado com sucesso para a frequência ${medicationProduct.frequencyValue} ${medicationProduct.frequencyUnit}`);
+      } else {
+        console.error(`❌ Falha ao enviar webhook: ${result?.message || 'erro desconhecido'}`);
+      }
     } else {
       console.log('URL de webhook não configurada, pulando envio de notificação');
     }
@@ -330,8 +334,8 @@ async function executeTask(task: ScheduledTask) {
         webhookSecret: webhookSecret
       });
       
-      console.log(`Próxima notificação agendada para ${nextNotificationTime.toISOString()} (medicamento ${medicationProduct.title})`);
-      console.log(`Tempo até a próxima notificação: ${Math.round(intervalMs/1000)} segundos`);
+      console.log(`📅 PRÓXIMA NOTIFICAÇÃO agendada para ${nextNotificationTime.toISOString()}`);
+      console.log(`⏱️ Tempo até a próxima notificação: ${Math.round(intervalMs/1000)} segundos`);
     }
     
     // Verificar se todos os tratamentos foram concluídos
@@ -351,18 +355,61 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
   
   try {
     console.log(`Enviando webhook para ${webhookUrl} - Tipo: ${payload.eventType}`);
-    console.log(`Payload: ${JSON.stringify(payload, null, 2)}`);
+    
+    // Verificar se o webhook é para o GitHub
+    const isGitHubWebhook = webhookUrl.includes('github.com') || webhookUrl.includes('api.github.com');
     
     // Configurar headers
     const headers: HeadersInit = {
       'Content-Type': 'application/json'
     };
     
-    if (webhookSecret) {
+    // Adicionar o token de autenticação para GitHub se for um webhook do GitHub
+    if (isGitHubWebhook && webhookSecret) {
+      headers['Authorization'] = `Bearer ${webhookSecret}`;
+      console.log('GitHub token configurado no header');
+    } else if (webhookSecret) {
       headers['X-Webhook-Secret'] = webhookSecret;
       console.log('Webhook Secret configurado no header');
-    } else {
-      console.log('Nenhum Webhook Secret configurado (opcional)');
+    }
+    
+    // Formatar payload específico para o GitHub se for um webhook do GitHub
+    let finalPayload = payload;
+    
+    if (isGitHubWebhook) {
+      // Criar payload específico para o GitHub
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const eventType = payload.eventType.replace(/_/g, '-');
+      const fileName = `${eventType}-${timestamp}.json`;
+      
+      const commitMessage = `Atualização: ${payload.eventType} para ${payload.petName} - ${payload.medicationProduct.title}`;
+      
+      // Verificar se o webhookUrl contém o caminho completo para criar o arquivo
+      let apiPath = webhookUrl;
+      
+      // Se a URL não termina com o caminho do arquivo, adicionar o caminho do arquivo
+      if (!apiPath.includes('/contents/')) {
+        const repoPath = apiPath.split('/repos/')[1];
+        if (repoPath) {
+          const [owner, repo] = repoPath.split('/');
+          apiPath = `https://api.github.com/repos/${owner}/${repo}/contents/webhooks/${fileName}`;
+        }
+      } else if (!apiPath.endsWith('.json')) {
+        apiPath = `${apiPath}/${fileName}`;
+      }
+      
+      console.log(`URL final do GitHub: ${apiPath}`);
+      
+      const githubPayload = {
+        message: commitMessage,
+        content: Buffer.from(JSON.stringify(payload, null, 2)).toString('base64'),
+        branch: 'main'
+      };
+      
+      finalPayload = githubPayload;
+      webhookUrl = apiPath;
+      
+      console.log('Payload formatado para GitHub:', finalPayload);
     }
     
     // Enviar webhook
@@ -371,7 +418,7 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(payload)
+      body: JSON.stringify(finalPayload)
     });
     
     const elapsedTime = Date.now() - startTime;
@@ -396,6 +443,9 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
     
     if (success) {
       console.log(`✅ Webhook ${payload.eventType} enviado com sucesso para ${webhookUrl}.`);
+      if (isGitHubWebhook) {
+        console.log('✅ Atualização enviada para o GitHub com sucesso!');
+      }
     } else {
       console.error(`❌ Erro ao enviar webhook ${payload.eventType}: status ${status}`);
       console.error(`Resposta: ${responseText}`);
@@ -422,6 +472,7 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
         statusCode: status,
         response: responseText.substring(0, 1000), // Limitar tamanho da resposta
         success: success,
+        isGitHub: isGitHubWebhook,
         createdAt: new Date()
       });
       
