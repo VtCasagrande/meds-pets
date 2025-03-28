@@ -2,26 +2,32 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import UserMenu from './UserMenu';
 
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
+  // Fechar menu quando o caminho muda
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
   
   const isActive = (path: string) => {
     return pathname === path;
   };
   
   return (
-    <nav className="bg-white shadow-soft border-b border-neutral-dark">
+    <nav className="bg-white shadow-md border-b border-gray-200">
       <div className="container mx-auto py-4 px-4 md:px-6">
         <div className="flex justify-between items-center">
           {/* Logo e nome */}
           <Link href="/" className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center text-white">
+            <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center text-white">
               <span className="text-xl font-bold">🐾</span>
             </div>
-            <span className="text-xl font-semibold text-dark">MedsPets</span>
+            <span className="text-xl font-semibold text-gray-800">MedsPets</span>
           </Link>
           
           {/* Menu para desktop */}
@@ -41,14 +47,16 @@ export default function Navbar() {
             <NavLink href="/webhook-logs" active={isActive('/webhook-logs')}>
               Logs
             </NavLink>
-            <NavLink href="/scheduler" active={isActive('/scheduler')}>
-              Agendador
-            </NavLink>
+          </div>
+          
+          {/* Área de usuário - Desktop */}
+          <div className="hidden md:flex items-center">
+            <UserMenu />
           </div>
           
           {/* Botão do menu mobile */}
           <button 
-            className="md:hidden flex items-center text-dark"
+            className="md:hidden flex items-center text-gray-800"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -79,9 +87,11 @@ export default function Navbar() {
             <MobileNavLink href="/webhook-logs" active={isActive('/webhook-logs')}>
               Logs
             </MobileNavLink>
-            <MobileNavLink href="/scheduler" active={isActive('/scheduler')}>
-              Agendador
-            </MobileNavLink>
+            
+            {/* Menu de usuário no mobile */}
+            <div className="border-t border-gray-200 my-3 pt-3 px-3">
+              <UserMenu />
+            </div>
           </div>
         )}
       </div>
@@ -95,8 +105,8 @@ function NavLink({ href, active, children }: { href: string; active: boolean; ch
       href={href} 
       className={`px-3 py-2 rounded-lg text-sm font-medium ${
         active 
-          ? 'bg-primary text-white'
-          : 'text-dark hover:bg-neutral-dark'
+          ? 'bg-blue-500 text-white'
+          : 'text-gray-800 hover:bg-gray-100'
       }`}
     >
       {children}
@@ -110,8 +120,8 @@ function MobileNavLink({ href, active, children }: { href: string; active: boole
       href={href} 
       className={`block px-3 py-2 rounded-lg text-base font-medium ${
         active 
-          ? 'bg-primary text-white'
-          : 'text-dark hover:bg-neutral-dark'
+          ? 'bg-blue-500 text-white'
+          : 'text-gray-800 hover:bg-gray-100'
       }`}
     >
       {children}

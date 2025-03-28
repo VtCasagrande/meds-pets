@@ -57,4 +57,34 @@ export type WebhookPayload = {
     startDateTime: string;
     endDateTime?: string;
   }
+}
+
+// Tipos para usuários e autenticação
+export type UserRole = 'admin' | 'user';
+
+export type User = {
+  id?: string;
+  _id?: string; // ID do MongoDB
+  name: string;
+  email: string;
+  role: UserRole;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type LoginCredentials = {
+  email: string;
+  password: string;
+}
+
+export type RegisterData = {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export type AuthResult = {
+  success: boolean;
+  message: string;
+  user?: User;
 } 
