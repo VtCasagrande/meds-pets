@@ -4,12 +4,14 @@ import Reminder from '@/app/lib/models/Reminder';
 import { WebhookPayload } from '@/app/lib/types';
 import { Types } from 'mongoose';
 import { getCurrentUserId, getCurrentUserRole, requireAuth } from '@/app/lib/auth';
+import { logActivity } from '@/app/lib/services/auditLogService';
+import { getServerSession } from 'next-auth';
+import { removeReminderNotifications } from '@/app/lib/services/schedulerService';
+import { logReminderUpdate, logReminderDeletion } from '@/app/lib/logHelpers';
 
 // Importar funções do schedulerService apenas em ambiente Node.js
 let scheduleReminderNotifications: (reminder: any, webhookUrl?: string, webhookSecret?: string) => Promise<void> = 
   async () => { console.log('Ambiente não suportado para agendamento'); };
-let removeReminderNotifications: (reminderId: string) => void = 
-  () => { console.log('Ambiente não suportado para remover notificações'); };
 
 // Verificar se estamos em ambiente Node.js (não Edge)
 if (typeof window === 'undefined' && typeof process !== 'undefined' &&
@@ -17,7 +19,6 @@ if (typeof window === 'undefined' && typeof process !== 'undefined' &&
   // Importação dinâmica para evitar problemas no Edge Runtime
   import('@/app/lib/services/schedulerService').then(module => {
     scheduleReminderNotifications = module.scheduleReminderNotifications;
-    removeReminderNotifications = module.removeReminderNotifications;
   }).catch(err => {
     console.error('Erro ao importar serviço de agendamento:', err);
   });
@@ -217,6 +218,10 @@ export async function PUT(
     const body = await request.json();
     console.log('Dados recebidos:', JSON.stringify(body, null, 2));
     
+    // Obter dados do usuário atual
+    const userId = await getCurrentUserId();
+    const userEmail = (await getServerSession())?.user?.email || '';
+    
     // Extrair a URL e chave secreta do webhook, se fornecidas
     // Ou usar as configurações de ambiente como fallback
     let webhookUrl = body.webhookUrl || process.env.WEBHOOK_URL || '';
@@ -243,6 +248,18 @@ export async function PUT(
     
     if (!existingReminder) {
       console.log(`Lembrete com ID ${id} não encontrado`);
+      
+      // Registrar tentativa de atualização de lembrete inexistente
+      await logActivity({
+        action: 'update',
+        entity: 'reminder',
+        entityId: id,
+        description: `Tentativa de atualizar lembrete inexistente`,
+        request,
+        performedById: userId,
+        performedByEmail: userEmail
+      });
+      
       return NextResponse.json(
         { error: 'Lembrete não encontrado' },
         { status: 404 }
@@ -262,74 +279,115 @@ export async function PUT(
     }
     
     // Verificar se o lembrete foi desativado ou reativado
-    const wasStatusChanged = existingReminder.isActive !== body.isActive;
-    const actionType = body.isActive ? 'reminder_activated' : 'reminder_deactivated';
-    const actionDescription = body.isActive 
-      ? `Lembrete para ${body.petName} foi reativado` 
-      : `Lembrete para ${body.petName} foi desativado`;
+    let statusChanged = false;
+    const wasActive = existingReminder.isActive;
+    if (typeof body.isActive !== 'undefined' && body.isActive !== wasActive) {
+      statusChanged = true;
+    }
     
-    console.log(`Status do lembrete ${wasStatusChanged ? 'foi alterado' : 'não foi alterado'}: ${existingReminder.isActive ? 'ativo' : 'inativo'} -> ${body.isActive ? 'ativo' : 'inativo'}`);
+    // Coletar dados antigos para o log de auditoria
+    const oldData = {
+      tutorName: existingReminder.tutorName,
+      petName: existingReminder.petName,
+      petBreed: existingReminder.petBreed,
+      phoneNumber: existingReminder.phoneNumber,
+      medicationCount: existingReminder.medicationProducts.length,
+      isActive: existingReminder.isActive
+    };
     
     // Remover campos do webhook dos dados do lembrete
     const reminderData = { ...body };
     delete reminderData.webhookUrl;
     delete reminderData.webhookSecret;
     
-    // Remover agendamentos existentes
+    // Remover agendamentos existentes antes de atualizar
     console.log(`Removendo agendamentos existentes para lembrete ${id}...`);
     removeReminderNotifications(id);
     
-    // Atualizar dados
-    console.log(`Atualizando lembrete ${id}...`);
+    // Atualizar o lembrete
     const updatedReminder = await Reminder.findByIdAndUpdate(
       id,
       { ...reminderData, updatedAt: new Date() },
       { new: true, runValidators: true }
     );
     
+    if (!updatedReminder) {
+      console.log(`Erro ao atualizar lembrete ${id} - não encontrado após tentativa de atualização`);
+      
+      // Registrar erro na atualização
+      await logActivity({
+        action: 'update',
+        entity: 'reminder',
+        entityId: id,
+        description: `Erro ao atualizar lembrete - não encontrado após atualização`,
+        request,
+        performedById: userId,
+        performedByEmail: userEmail
+      });
+      
+      return NextResponse.json(
+        { error: 'Erro ao atualizar lembrete' },
+        { status: 500 }
+      );
+    }
+    
     console.log(`Lembrete ${id} atualizado com sucesso`);
     
+    // Registrar log de auditoria para atualização
+    const logDescription = statusChanged 
+      ? `Lembrete ${updatedReminder.isActive ? 'reativado' : 'desativado'} para "${updatedReminder.petName}"`
+      : `Lembrete atualizado para "${updatedReminder.petName}" de ${updatedReminder.tutorName}`;
+      
+    await logReminderUpdate(
+      updatedReminder as Reminder,
+      oldData,
+      userId as string,
+      userEmail as string,
+      request
+    );
+    
     // Enviar webhook para o primeiro medicamento (atualização de lembrete)
-    if (updatedReminder && updatedReminder.medicationProducts.length > 0) {
+    if (updatedReminder.medicationProducts.length > 0) {
       const firstProduct = updatedReminder.medicationProducts[0];
+      const webhookUrl = body.webhookUrl || webhookSecret || process.env.WEBHOOK_URL || '';
+      const webhookSecret = body.webhookSecret || process.env.WEBHOOK_SECRET || '';
       
-      // Determinar o tipo de evento baseado na mudança de status
-      let eventType: 'reminder_updated' | 'reminder_activated' | 'reminder_deactivated';
-      let eventDescription: string;
-      
-      if (wasStatusChanged) {
-        eventType = actionType as 'reminder_activated' | 'reminder_deactivated';
-        eventDescription = actionDescription;
-      } else {
-        eventType = 'reminder_updated';
-        eventDescription = 'Lembrete atualizado';
-      }
-      
-      console.log(`Tipo de evento webhook: ${eventType}, descrição: ${eventDescription}`);
-      
-      // Preparar payload do webhook
-      const webhookPayload: WebhookPayload = {
-        reminderId: updatedReminder._id ? (updatedReminder._id instanceof Types.ObjectId ? updatedReminder._id.toString() : String(updatedReminder._id)) : id,
-        tutorName: updatedReminder.tutorName,
-        petName: updatedReminder.petName,
-        petBreed: updatedReminder.petBreed || '',
-        phoneNumber: updatedReminder.phoneNumber,
-        eventType: eventType,
-        eventDescription: eventDescription,
-        medicationProduct: {
-          title: firstProduct.title,
-          quantity: firstProduct.quantity,
-          frequencyValue: firstProduct.frequencyValue || 0,
-          frequencyUnit: (firstProduct.frequencyUnit as 'minutos' | 'horas' | 'dias') || 'horas',
-          duration: firstProduct.duration || 0,
-          durationUnit: (firstProduct.durationUnit as 'dias' | 'semanas' | 'meses') || 'dias',
-          startDateTime: firstProduct.startDateTime ? firstProduct.startDateTime.toISOString() : '',
-          endDateTime: firstProduct.endDateTime ? firstProduct.endDateTime.toISOString() : ''
+      if (webhookUrl) {
+        let eventType: WebhookEventType;
+        let eventDescription: string;
+        
+        if (statusChanged) {
+          eventType = updatedReminder.isActive ? 'reminder_activated' : 'reminder_deactivated';
+          eventDescription = `Lembrete para ${updatedReminder.petName} foi ${updatedReminder.isActive ? 'reativado' : 'desativado'}`;
+        } else {
+          eventType = 'reminder_updated';
+          eventDescription = 'Lembrete atualizado';
         }
-      };
-      
-      // Enviar webhook de atualização
-      await sendWebhook(webhookPayload, webhookUrl, webhookSecret);
+        
+        // Preparar payload do webhook
+        const webhookPayload: WebhookPayload = {
+          reminderId: updatedReminder._id ? (updatedReminder._id instanceof Types.ObjectId ? updatedReminder._id.toString() : String(updatedReminder._id)) : id,
+          tutorName: updatedReminder.tutorName,
+          petName: updatedReminder.petName,
+          petBreed: updatedReminder.petBreed || '',
+          phoneNumber: updatedReminder.phoneNumber,
+          eventType: eventType,
+          eventDescription: eventDescription,
+          medicationProduct: {
+            title: firstProduct.title,
+            quantity: firstProduct.quantity,
+            frequencyValue: firstProduct.frequencyValue || 0,
+            frequencyUnit: (firstProduct.frequencyUnit as 'minutos' | 'horas' | 'dias') || 'horas',
+            duration: firstProduct.duration || 0,
+            durationUnit: (firstProduct.durationUnit as 'dias' | 'semanas' | 'meses') || 'dias',
+            startDateTime: firstProduct.startDateTime ? firstProduct.startDateTime.toISOString() : '',
+            endDateTime: firstProduct.endDateTime ? firstProduct.endDateTime.toISOString() : ''
+          }
+        };
+        
+        // Enviar webhook de atualização
+        await sendWebhook(webhookPayload, webhookUrl, webhookSecret);
+      }
     }
     
     // Reagendar notificações se o lembrete estiver ativo
@@ -341,6 +399,17 @@ export async function PUT(
     return NextResponse.json(updatedReminder);
   } catch (error) {
     console.error(`Erro ao atualizar lembrete ${id}:`, error);
+    
+    // Registrar erro no processo de atualização
+    await logActivity({
+      action: 'update',
+      entity: 'reminder',
+      entityId: id,
+      description: `Erro ao processar atualização de lembrete`,
+      details: { error: error instanceof Error ? error.message : 'Erro desconhecido' },
+      request
+    });
+    
     if (error instanceof Error) {
       console.error('Detalhes do erro:', error.message);
       console.error('Stack trace:', error.stack);
@@ -366,6 +435,10 @@ export async function DELETE(
     const authError = await requireAuth(request);
     if (authError) return authError;
     
+    // Obter dados do usuário atual
+    const userId = await getCurrentUserId();
+    const userEmail = (await getServerSession())?.user?.email || '';
+    
     console.log('Conectando ao banco de dados...');
     await dbConnect();
     console.log('Conexão estabelecida com sucesso');
@@ -375,6 +448,18 @@ export async function DELETE(
     
     if (!reminder) {
       console.log(`Lembrete com ID ${id} não encontrado`);
+      
+      // Registrar tentativa de exclusão de lembrete inexistente
+      await logActivity({
+        action: 'delete',
+        entity: 'reminder',
+        entityId: id,
+        description: `Tentativa de excluir lembrete inexistente`,
+        request,
+        performedById: userId,
+        performedByEmail: userEmail
+      });
+      
       return NextResponse.json(
         { error: 'Lembrete não encontrado' },
         { status: 404 }
@@ -392,6 +477,16 @@ export async function DELETE(
         { status: 403 }
       );
     }
+    
+    // Guardar dados do lembrete para o log antes de excluir
+    const reminderData = {
+      tutorName: reminder.tutorName,
+      petName: reminder.petName,
+      petBreed: reminder.petBreed,
+      phoneNumber: reminder.phoneNumber,
+      isActive: reminder.isActive,
+      medicationCount: reminder.medicationProducts.length
+    };
     
     // Remover agendamentos existentes antes de excluir o lembrete
     console.log(`Removendo agendamentos para lembrete ${id}...`);
@@ -438,10 +533,29 @@ export async function DELETE(
     console.log(`Excluindo lembrete ${id}...`);
     await Reminder.findByIdAndDelete(id);
     
+    // Registrar atividade de exclusão do lembrete
+    await logReminderDeletion(
+      reminder as Reminder,
+      userId as string,
+      userEmail as string,
+      request
+    );
+    
     console.log(`Lembrete ${id} excluído com sucesso`);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error(`Erro ao remover lembrete ${id}:`, error);
+    
+    // Registrar erro no processo de exclusão
+    await logActivity({
+      action: 'delete',
+      entity: 'reminder',
+      entityId: id,
+      description: `Erro ao processar exclusão de lembrete`,
+      details: { error: error instanceof Error ? error.message : 'Erro desconhecido' },
+      request
+    });
+    
     if (error instanceof Error) {
       console.error('Detalhes do erro:', error.message);
       console.error('Stack trace:', error.stack);

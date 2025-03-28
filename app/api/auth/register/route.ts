@@ -3,6 +3,8 @@ import { hash } from 'bcryptjs';
 import dbConnect from '@/app/lib/db';
 import User, { IUser } from '@/app/lib/models/User';
 import { Document, Types } from 'mongoose';
+import { logActivity } from '@/app/lib/services/auditLogService';
+import { logRegister } from '@/app/lib/logHelpers';
 
 export async function POST(req: NextRequest) {
   try {
@@ -29,6 +31,15 @@ export async function POST(req: NextRequest) {
     // Verificar se o e-mail já está em uso
     const existingUser = await User.findOne({ email });
     if (existingUser) {
+      // Registrar tentativa de registro com email existente
+      await logActivity({
+        action: 'register',
+        entity: 'user',
+        description: `Tentativa de registro com email já existente: ${email}`,
+        request: req,
+        performedByEmail: email
+      });
+      
       return NextResponse.json(
         { message: 'Este e-mail já está sendo usado' },
         { status: 409 }
@@ -56,9 +67,14 @@ export async function POST(req: NextRequest) {
       role
     }) as IUser & Document;
 
+    const userId = newUser._id instanceof Types.ObjectId ? newUser._id.toString() : String(newUser._id);
+
+    // Registrar log de registro bem-sucedido
+    await logRegister(userId, email, req);
+
     // Retornar resposta sem expor a senha
     const user = {
-      id: newUser._id instanceof Types.ObjectId ? newUser._id.toString() : String(newUser._id),
+      id: userId,
       name: newUser.name,
       email: newUser.email,
       role: newUser.role,
@@ -68,6 +84,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ message: 'Usuário criado com sucesso', user }, { status: 201 });
   } catch (error) {
     console.error('Erro ao registrar usuário:', error);
+    
+    // Registrar erro no processo de registro
+    await logActivity({
+      action: 'register',
+      entity: 'user',
+      description: 'Erro ao registrar usuário',
+      details: { error: error instanceof Error ? error.message : String(error) },
+      request: req
+    });
+    
     return NextResponse.json(
       { message: 'Erro ao registrar usuário' },
       { status: 500 }

@@ -116,13 +116,22 @@ export default function UserMenu() {
             </Link>
             
             {(userRole === 'admin' || userRole === 'creator') && (
-              <Link
-                href="/admin"
-                onClick={() => setIsOpen(false)}
-                className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-              >
-                Administração
-              </Link>
+              <>
+                <Link
+                  href="/admin"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                >
+                  Administração
+                </Link>
+                <Link
+                  href="/audit-logs"
+                  onClick={() => setIsOpen(false)}
+                  className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                >
+                  Logs de Auditoria
+                </Link>
+              </>
             )}
             
             {userRole === 'creator' && (

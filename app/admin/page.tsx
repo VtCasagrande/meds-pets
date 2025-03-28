@@ -144,10 +144,17 @@ export default function AdminPage() {
           <div className="p-4 border border-neutral-dark rounded-lg">
             <h3 className="font-medium text-dark">Logs do Sistema</h3>
             <p className="text-sm text-dark-light mt-1">Visualize os logs de webhooks e operações do sistema</p>
-            <div className="mt-3">
-              <Link href="/webhook-logs" className="text-primary hover:underline text-sm">
-                Ver Logs de Webhook →
-              </Link>
+            <div className="mt-3 space-y-2">
+              <div>
+                <Link href="/webhook-logs" className="text-primary hover:underline text-sm">
+                  Ver Logs de Webhook →
+                </Link>
+              </div>
+              <div>
+                <Link href="/audit-logs" className="text-primary hover:underline text-sm">
+                  Ver Logs de Auditoria →
+                </Link>
+              </div>
             </div>
           </div>
         </div>

@@ -3,11 +3,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import UserMenu from './UserMenu';
 
 export default function Navbar() {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { data: session } = useSession();
+  const isAdminOrCreator = (session?.user as any)?.role === 'admin' || (session?.user as any)?.role === 'creator';
   
   // Fechar menu quando o caminho muda
   useEffect(() => {
@@ -47,6 +50,11 @@ export default function Navbar() {
             <NavLink href="/webhook-logs" active={isActive('/webhook-logs')}>
               Logs
             </NavLink>
+            {isAdminOrCreator && (
+              <NavLink href="/audit-logs" active={isActive('/audit-logs')}>
+                Logs de Auditoria
+              </NavLink>
+            )}
           </div>
           
           {/* Área de usuário - Desktop */}
@@ -87,6 +95,11 @@ export default function Navbar() {
             <MobileNavLink href="/webhook-logs" active={isActive('/webhook-logs')}>
               Logs
             </MobileNavLink>
+            {isAdminOrCreator && (
+              <MobileNavLink href="/audit-logs" active={isActive('/audit-logs')}>
+                Logs de Auditoria
+              </MobileNavLink>
+            )}
             
             {/* Menu de usuário no mobile */}
             <div className="border-t border-gray-200 my-3 pt-3 px-3">

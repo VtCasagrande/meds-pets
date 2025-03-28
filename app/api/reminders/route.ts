@@ -4,6 +4,9 @@ import Reminder from '@/app/lib/models/Reminder';
 import { WebhookPayload } from '@/app/lib/types';
 import { Types } from 'mongoose';
 import { getCurrentUserId, getCurrentUserRole, requireAuth } from '@/app/lib/auth';
+import { logActivity } from '@/app/lib/services/auditLogService';
+import { getServerSession } from 'next-auth';
+import { logReminderCreation } from '@/app/lib/logHelpers';
 
 // Importar funções do schedulerService apenas em ambiente Node.js
 let scheduleReminderNotifications: (reminder: any, webhookUrl?: string, webhookSecret?: string) => Promise<void> = 
@@ -203,6 +206,7 @@ export async function POST(request: NextRequest) {
     
     // Obter ID do usuário atual para armazenar como criador
     const userId = await getCurrentUserId();
+    const userEmail = (await getServerSession())?.user?.email || '';
     
     // Extrair a URL e chave secreta do webhook, se fornecidas
     // Ou usar as configurações de ambiente como fallback
@@ -256,6 +260,14 @@ export async function POST(request: NextRequest) {
       await reminder.save();
       console.log('Lembrete criado com sucesso, ID:', reminder._id);
       
+      // Registrar log de auditoria para criação de lembrete
+      await logReminderCreation(
+        reminder as Reminder, 
+        userId as string, 
+        userEmail as string, 
+        request
+      );
+      
       // Enviar webhook para o primeiro medicamento (criação de lembrete)
       if (reminder.medicationProducts.length > 0) {
         const firstProduct = reminder.medicationProducts[0];
@@ -292,11 +304,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(reminder, { status: 201 });
     } catch (dbError: any) {
       console.error('Erro ao salvar no banco de dados:', dbError);
-      console.error('Detalhes do erro:', {
-        name: dbError.name,
-        code: dbError.code,
-        message: dbError.message,
-        errors: dbError.errors
+      
+      // Registrar log de erro
+      await logActivity({
+        action: 'create',
+        entity: 'reminder',
+        description: 'Erro ao criar lembrete',
+        details: { error: dbError.message || 'Erro desconhecido' },
+        request,
+        performedById: userId,
+        performedByEmail: userEmail
       });
       
       // Verificar erros de validação
@@ -323,6 +340,15 @@ export async function POST(request: NextRequest) {
       console.error('Detalhes do erro:', error.message);
       console.error('Stack trace:', error.stack);
     }
+    
+    // Registrar log de erro
+    await logActivity({
+      action: 'create',
+      entity: 'reminder',
+      description: 'Erro ao processar criação de lembrete',
+      details: { error: error instanceof Error ? error.message : 'Erro desconhecido' },
+      request
+    });
     
     return NextResponse.json(
       { error: 'Erro ao criar lembrete' },
