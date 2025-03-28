@@ -34,7 +34,9 @@ export async function GET() {
     const nextTask = sortedTasks.length > 0 ? sortedTasks[0] : null;
     
     // Agrupar por reminderId para identificar quantos lembretes diferentes estão agendados
-    const reminders = [...new Set(tasks.map(task => task.reminderId))];
+    const uniqueReminderIds = new Set<string>();
+    tasks.forEach(task => uniqueReminderIds.add(task.reminderId));
+    const uniqueRemindersCount = uniqueReminderIds.size;
     
     return NextResponse.json({ 
       success: true, 
@@ -42,7 +44,7 @@ export async function GET() {
       stats: {
         totalTasks: tasks.length,
         pendingTasks: pendingTasks.length,
-        uniqueReminders: reminders.length
+        uniqueReminders: uniqueRemindersCount
       },
       nextTask: nextTask ? {
         id: nextTask.id,
