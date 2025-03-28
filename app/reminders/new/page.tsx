@@ -167,8 +167,15 @@ export default function NewReminderPage() {
         throw new Error(errorData.error || 'Erro ao criar o lembrete');
       }
       
-      // Redirecionar para a lista de lembretes após sucesso
-      router.push('/reminders');
+      // Apenas redirecionar se a operação de criação for bem-sucedida
+      const data = await response.json();
+      
+      if (data && data._id) {
+        // Redirecionar para a lista de lembretes após sucesso
+        router.push('/reminders');
+      } else {
+        throw new Error('Resposta sem ID do lembrete');
+      }
     } catch (error) {
       console.error('Erro ao criar lembrete:', error);
       setError('Não foi possível criar o lembrete. Tente novamente mais tarde.');
@@ -288,48 +295,46 @@ export default function NewReminderPage() {
               )}
             </div>
             
-            {reminder.medicationProducts.length > 0 ? (
-              <MedicationProductList
-                products={reminder.medicationProducts}
-                onEdit={handleEditProduct}
-                onDelete={handleDeleteProduct}
-              />
-            ) : !showProductForm ? (
-              <div className="bg-neutral/50 border border-neutral-dark rounded-lg p-6 text-center">
-                <div className="mb-3 text-dark-light">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                </div>
-                <p className="text-dark mb-2">Nenhum medicamento adicionado</p>
-                <p className="text-dark-light text-sm mb-4">Adicione pelo menos um medicamento para criar o lembrete</p>
-                <button
-                  type="button"
-                  onClick={() => setShowProductForm(true)}
-                  className="btn-secondary"
-                >
-                  Adicionar Medicamento
-                </button>
-              </div>
-            ) : null}
-          </div>
-          
-          {showProductForm && (
-            <div className="mb-8">
+            {showProductForm ? (
               <MedicationProductForm
                 onAdd={handleAddProduct}
                 onCancel={() => {
                   setShowProductForm(false);
                   setEditingProductIndex(null);
                 }}
-                initialData={
-                  editingProductIndex !== null
-                    ? reminder.medicationProducts[editingProductIndex]
-                    : undefined
-                }
+                initialData={editingProductIndex !== null ? reminder.medicationProducts[editingProductIndex] : undefined}
               />
-            </div>
-          )}
+            ) : (
+              <div className="mb-6">
+                <h2 className="text-xl font-medium mb-4">Medicamentos</h2>
+                
+                {reminder.medicationProducts.length > 0 ? (
+                  <MedicationProductList
+                    products={reminder.medicationProducts}
+                    onEdit={handleEditProduct}
+                    onDelete={handleDeleteProduct}
+                  />
+                ) : (
+                  <div className="border border-neutral-dark border-dashed rounded-lg p-8 text-center">
+                    <p className="text-neutral-dark mb-4">
+                      Nenhum medicamento adicionado ainda.
+                    </p>
+                  </div>
+                )}
+                
+                <button
+                  type="button" // Garantir que este botão seja do tipo "button" para não submeter o formulário principal
+                  onClick={() => setShowProductForm(true)}
+                  className="btn-secondary mt-4"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 00-1 1v5H4a1 1 0 100 2h5v5a1 1 0 102 0v-5h5a1 1 0 100-2h-5V4a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  Adicionar Medicamento
+                </button>
+              </div>
+            )}
+          </div>
           
           {/* Configurações de Webhook (Avançado) - Colapsável */}
           <div className="mb-8">

@@ -266,7 +266,7 @@ export default function MedicationProductForm({
   };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // Impedir o comportamento padrão de submissão do formulário
     onAdd(product);
   };
 
