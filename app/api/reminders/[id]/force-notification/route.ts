@@ -172,9 +172,12 @@ export async function POST(
     const medicationProduct = reminder.medicationProducts[0];
     console.log(`Usando medicamento '${medicationProduct.title}'`);
     
-    // Extrair a URL e chave secreta do webhook das variáveis de ambiente ou do lembrete
-    const webhookUrl = reminder.webhookUrl || process.env.WEBHOOK_URL || 'https://webhook.site/2183e9be-ce1f-400d-bd28-c589a1938b44';
-    const webhookSecret = reminder.webhookSecret || process.env.WEBHOOK_SECRET || '';
+    // Extrair a URL e chave secreta do webhook das variáveis de ambiente ou dos dados do corpo da requisição
+    const reminderData = await request.json().catch(() => ({}));
+    
+    // Usar URL e segredo do corpo da requisição, ou variáveis de ambiente, ou URL padrão
+    const webhookUrl = reminderData.webhookUrl || process.env.WEBHOOK_URL || 'https://webhook.site/2183e9be-ce1f-400d-bd28-c589a1938b44';
+    const webhookSecret = reminderData.webhookSecret || process.env.WEBHOOK_SECRET || '';
     
     console.log(`Configurações de webhook - URL: ${webhookUrl}, Secret: ${webhookSecret ? 'configurado' : 'não configurado'}`);
     

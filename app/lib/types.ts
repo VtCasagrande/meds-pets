@@ -26,6 +26,8 @@ export type Reminder = {
   isActive: boolean;
   createdAt?: string;
   updatedAt?: string;
+  webhookUrl?: string;
+  webhookSecret?: string;
 }
 
 // Estado da listagem de lembretes
