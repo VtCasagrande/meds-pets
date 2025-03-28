@@ -127,15 +127,14 @@ export function startScheduler() {
   
   console.log('Iniciando serviço de agendamento de webhooks...');
   
-  // Verificar tarefas a cada 30 segundos
-  // Em produção, este intervalo seria ajustado conforme necessário
-  schedulerInterval = setInterval(checkScheduledTasks, 30 * 1000);
+  // Verificar tarefas a cada 15 segundos para garantir boa resposta em intervalos curtos
+  schedulerInterval = setInterval(checkScheduledTasks, 15 * 1000);
   
   // Verificar lembretes concluídos uma vez ao iniciar
   checkAllCompletedReminders();
   
-  // E depois diariamente (a cada 24 horas)
-  setInterval(checkAllCompletedReminders, 24 * 60 * 60 * 1000);
+  // E depois a cada 5 minutos (em vez de diariamente)
+  setInterval(checkAllCompletedReminders, 5 * 60 * 1000);
   
   console.log('Serviço de agendamento iniciado.');
 }
@@ -154,9 +153,12 @@ async function checkScheduledTasks() {
   const now = new Date();
   console.log(`[${now.toISOString()}] Verificando tarefas agendadas...`);
   
+  // Adicionar 1 segundo para prevenir problemas de timing e garantir que tarefas sejam executadas
+  const checkTime = new Date(now.getTime() + 1000);
+  
   // Filtrar tarefas que devem ser executadas agora
   const tasksToRun = scheduledTasks.filter(task => 
-    task.scheduledTime <= now
+    task.scheduledTime <= checkTime
   );
   
   if (tasksToRun.length > 0) {
@@ -164,7 +166,7 @@ async function checkScheduledTasks() {
     
     // Remover tarefas que serão executadas da lista
     scheduledTasks = scheduledTasks.filter(task => 
-      task.scheduledTime > now
+      !tasksToRun.some(t => t.id === task.id)
     );
     
     // Executar cada tarefa
@@ -173,6 +175,19 @@ async function checkScheduledTasks() {
     }
   } else {
     console.log('Nenhuma tarefa para executar no momento.');
+    
+    // Registrar próximas tarefas agendadas para depuração
+    if (scheduledTasks.length > 0) {
+      const sortedTasks = [...scheduledTasks].sort((a, b) => 
+        a.scheduledTime.getTime() - b.scheduledTime.getTime()
+      );
+      
+      console.log(`Próximas ${Math.min(3, sortedTasks.length)} tarefas agendadas:`);
+      sortedTasks.slice(0, 3).forEach(task => {
+        const timeUntil = Math.round((task.scheduledTime.getTime() - now.getTime()) / 1000);
+        console.log(`- Tarefa ${task.id} para lembrete ${task.reminderId} em ${timeUntil} segundos (${task.scheduledTime.toISOString()})`);
+      });
+    }
   }
 }
 
@@ -241,7 +256,8 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
   }
   
   try {
-    console.log(`Enviando webhook para ${webhookUrl}`);
+    console.log(`Enviando webhook para ${webhookUrl} - Tipo: ${payload.eventType}`);
+    console.log(`Payload: ${JSON.stringify(payload, null, 2)}`);
     
     // Configurar headers
     const headers: HeadersInit = {
@@ -250,25 +266,38 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
     
     if (webhookSecret) {
       headers['X-Webhook-Secret'] = webhookSecret;
+      console.log('Webhook Secret configurado no header');
     }
     
     // Enviar webhook
+    const startTime = Date.now();
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload)
     });
     
+    const elapsedTime = Date.now() - startTime;
     const status = response.status;
-    console.log(`Resposta do webhook: status ${status}`);
+    console.log(`Resposta do webhook: status ${status}, tempo: ${elapsedTime}ms`);
+    
+    // Tentar obter corpo da resposta
+    try {
+      const responseText = await response.text();
+      if (responseText) {
+        console.log(`Resposta do webhook: ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`);
+      }
+    } catch (textError) {
+      console.log('Não foi possível obter texto da resposta');
+    }
     
     if (status >= 200 && status < 300) {
-      console.log('Webhook enviado com sucesso.');
+      console.log(`Webhook ${payload.eventType} enviado com sucesso.`);
     } else {
-      console.error(`Erro ao enviar webhook: status ${status}`);
+      console.error(`Erro ao enviar webhook ${payload.eventType}: status ${status}`);
     }
   } catch (error) {
-    console.error('Erro ao enviar webhook:', error);
+    console.error(`Erro ao enviar webhook ${payload.eventType}:`, error);
   }
 }
 
@@ -419,12 +448,27 @@ function scheduleNextNotification(
         break;
     }
     
+    // Para intervalos muito curtos (menos de 1 minuto), forçar intervalo mínimo
+    if (intervalMs < 30000) {
+      console.log(`Intervalo de ${intervalMs}ms é muito curto, usando intervalo mínimo de 30 segundos`);
+      intervalMs = 30000;
+    }
+    
     // Calcular quantos intervalos se passaram desde o início
     const timeSinceStart = now.getTime() - startDate.getTime();
     const intervals = Math.floor(timeSinceStart / intervalMs);
     
     // Calcular quando será a próxima ocorrência
-    nextNotificationTime = new Date(startDate.getTime() + (intervals + 1) * intervalMs);
+    const calculatedTime = startDate.getTime() + (intervals + 1) * intervalMs;
+    
+    // Garantir que a próxima notificação seja no futuro (pelo menos 5 segundos no futuro)
+    if (calculatedTime <= now.getTime() + 5000) {
+      // Se a próxima notificação calculada for no passado ou muito próxima, agendar para o próximo intervalo
+      nextNotificationTime = new Date(now.getTime() + intervalMs);
+      console.log(`Próxima notificação calculada estava no passado ou muito próxima, agendada para ${intervalMs}ms a partir de agora`);
+    } else {
+      nextNotificationTime = new Date(calculatedTime);
+    }
   }
   
   // Verificar se a data final já passou

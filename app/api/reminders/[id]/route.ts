@@ -118,7 +118,9 @@ export async function PUT(
     console.log('Dados recebidos:', JSON.stringify(body, null, 2));
     
     // Extrair a URL e chave secreta do webhook, se fornecidas
-    const { webhookUrl, webhookSecret } = body;
+    // Ou usar as configurações de ambiente como fallback
+    const webhookUrl = body.webhookUrl || process.env.WEBHOOK_URL || '';
+    const webhookSecret = body.webhookSecret || process.env.WEBHOOK_SECRET || '';
     
     console.log('Conectando ao banco de dados...');
     await dbConnect();
