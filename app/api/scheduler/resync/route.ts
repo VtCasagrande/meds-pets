@@ -52,26 +52,29 @@ export async function POST() {
     
     // Reagendar cada lembrete
     for (const reminderDoc of activeReminders) {
+      // Verificação de segurança para o _id
+      const id = reminderDoc._id ? reminderDoc._id.toString() : `unknown-${Date.now()}`;
+      
       // Converter documento do MongoDB para o formato Reminder
       const reminder = {
-        id: reminderDoc._id.toString(),
-        _id: reminderDoc._id.toString(),
-        tutorName: reminderDoc.tutorName,
-        petName: reminderDoc.petName,
+        id: id,
+        _id: id,
+        tutorName: reminderDoc.tutorName || '',
+        petName: reminderDoc.petName || '',
         petBreed: reminderDoc.petBreed || '',
-        phoneNumber: reminderDoc.phoneNumber,
-        isActive: reminderDoc.isActive,
+        phoneNumber: reminderDoc.phoneNumber || '',
+        isActive: reminderDoc.isActive !== false, // Garantir que seja true se não for explicitamente false
         webhookUrl: reminderDoc.webhookUrl || webhookUrl,
         webhookSecret: reminderDoc.webhookSecret || webhookSecret,
-        medicationProducts: reminderDoc.medicationProducts.map(product => {
+        medicationProducts: (reminderDoc.medicationProducts || []).map(product => {
           // Garantir tipos corretos para frequencyUnit e durationUnit
           const frequencyUnit = (product.frequencyUnit as 'minutos' | 'horas' | 'dias') || 'horas';
           const durationUnit = (product.durationUnit as 'dias' | 'semanas' | 'meses') || 'dias';
           
           return {
             id: product._id ? product._id.toString() : undefined,
-            title: product.title,
-            quantity: product.quantity,
+            title: product.title || '',
+            quantity: product.quantity || '',
             frequency: product.frequency || '',
             frequencyValue: product.frequencyValue || 8,
             frequencyUnit: frequencyUnit,
