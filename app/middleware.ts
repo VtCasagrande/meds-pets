@@ -7,7 +7,7 @@ export function middleware(request: NextRequest) {
   // Verificar se estamos em ambiente de servidor (não Edge)
   if (typeof window === 'undefined' && !schedulerStarted && typeof process !== 'undefined') {
     // Importar dinamicamente apenas em ambiente Node.js
-    if (process.env.NODE_ENV !== 'production' || process.env.NEXT_RUNTIME !== 'edge') {
+    if (process.env.NEXT_RUNTIME !== 'edge') {
       import('./lib/services/schedulerService').then(({ startScheduler }) => {
         console.log('Iniciando serviço de agendamento via middleware...');
         startScheduler();
