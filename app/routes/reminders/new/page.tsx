@@ -211,7 +211,6 @@ export default function NewReminderPage() {
                 products={reminder.medicationProducts}
                 onEdit={handleEditProduct}
                 onDelete={handleDeleteProduct}
-                isEditable={true}
               />
             )}
           </div>
