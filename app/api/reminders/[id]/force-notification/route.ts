@@ -252,8 +252,8 @@ export async function POST(
       
       // Garantir que todos os campos necessários estão presentes e com valores válidos
       const reminderForScheduling = {
-        id: reminder._id.toString(),
-        _id: reminder._id.toString(),
+        id: reminder._id ? reminder._id.toString() : id,
+        _id: reminder._id ? reminder._id.toString() : id,
         tutorName: reminderObj.tutorName,
         petName: reminderObj.petName,
         petBreed: reminderObj.petBreed || '',
