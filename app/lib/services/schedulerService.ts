@@ -393,8 +393,15 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
       console.log('Webhook Secret configurado no header');
     }
     
+    // Definir o tipo para o payload final
+    type FinalPayloadType = WebhookPayload | {
+      message: string;
+      content: string;
+      branch: string;
+    };
+    
     // Formatar payload específico para o GitHub se for um webhook do GitHub
-    let finalPayload = payload;
+    let finalPayload: FinalPayloadType = payload;
     
     if (isGitHubWebhook) {
       // Criar payload específico para o GitHub
