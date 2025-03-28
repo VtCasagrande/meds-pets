@@ -125,14 +125,8 @@ export default function SchedulerStatusPage() {
       setActionSuccess(null);
       setError(null);
       
-      const response = await fetch('/api/reminders/update-webhooks', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          force: true
-        })
+      const response = await fetch('/api/scheduler/resync', {
+        method: 'POST'
       });
       
       if (!response.ok) {
@@ -140,7 +134,12 @@ export default function SchedulerStatusPage() {
       }
       
       const data = await response.json();
-      setActionSuccess('Todas as notificações foram reagendadas com sucesso!');
+      
+      if (data.success) {
+        setActionSuccess(`Ressincronização concluída! ${data.stats?.activeReminders || 0} lembretes reagendados com ${data.stats?.tasksScheduled || 0} notificações.`);
+      } else {
+        throw new Error(data.message || 'Erro desconhecido ao ressincronizar');
+      }
       
       // Recarregar status após reagendar
       await loadStatus();

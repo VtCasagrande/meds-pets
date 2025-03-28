@@ -12,14 +12,21 @@ export async function GET() {
     }
     
     // Importar serviços de agendamento dinamicamente
-    const { listScheduledTasks, startScheduler } = await import('@/app/lib/services/schedulerService');
+    const { 
+      listScheduledTasks, 
+      startScheduler, 
+      getSchedulerStatus 
+    } = await import('@/app/lib/services/schedulerService');
     
     // Iniciar o agendador se ainda não estiver iniciado
     // Isso garante que sempre que este endpoint for chamado, o agendador estará rodando
-    startScheduler();
+    const schedulerRunning = startScheduler();
     
-    // Obter tarefas agendadas
+    // Reagendar todos os lembretes caso não haja tarefas
     const tasks = listScheduledTasks();
+    
+    // Obter informações adicionais do agendador
+    const schedulerInfo = getSchedulerStatus();
     
     // Calcular estatísticas
     const now = new Date();
@@ -41,6 +48,13 @@ export async function GET() {
     return NextResponse.json({ 
       success: true, 
       message: 'Agendador está ativo',
+      schedulerInfo: {
+        isRunning: schedulerRunning,
+        lastCheck: schedulerInfo.lastCheck,
+        checkInterval: schedulerInfo.checkInterval,
+        startTime: schedulerInfo.startTime,
+        uptime: Math.floor((Date.now() - new Date(schedulerInfo.startTime).getTime()) / 1000)
+      },
       stats: {
         totalTasks: tasks.length,
         pendingTasks: pendingTasks.length,

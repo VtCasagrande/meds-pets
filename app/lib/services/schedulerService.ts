@@ -27,6 +27,11 @@ let scheduledTasks: ScheduledTask[] = [];
 // Intervalo que verifica tarefas a cada minuto
 let schedulerInterval: NodeJS.Timeout | null = null;
 
+// Variáveis de monitoramento para o agendador
+let schedulerStartTime: Date | null = null;
+let schedulerLastCheck: Date | null = null;
+let schedulerCheckInterval: number = 15 * 1000; // 15 segundos padrão
+
 // Função auxiliar para formatar data segura (independente do tipo)
 function formatDateSafe(date: any): string {
   if (!date) return '';
@@ -130,21 +135,28 @@ async function checkAllCompletedReminders() {
 }
 
 // Iniciar o agendador
-export function startScheduler() {
+export function startScheduler(): boolean {
   // Verificar se estamos em ambiente de servidor (não Edge)
   if (!isNodeEnvironment) {
     console.log('Agendador não iniciado: ambiente não suportado');
-    return;
+    return false;
   }
 
   if (schedulerInterval) {
-    return; // Já está rodando
+    return true; // Já está rodando
   }
   
   console.log('Iniciando serviço de agendamento de webhooks...');
   
+  // Registrar o tempo de início
+  schedulerStartTime = new Date();
+  
   // Verificar tarefas a cada 15 segundos para garantir boa resposta em intervalos curtos
-  schedulerInterval = setInterval(checkScheduledTasks, 15 * 1000);
+  schedulerCheckInterval = 15 * 1000;
+  schedulerInterval = setInterval(() => {
+    schedulerLastCheck = new Date();
+    checkScheduledTasks();
+  }, schedulerCheckInterval);
   
   // Verificar lembretes concluídos uma vez ao iniciar
   checkAllCompletedReminders();
@@ -153,6 +165,7 @@ export function startScheduler() {
   setInterval(checkAllCompletedReminders, 5 * 60 * 1000);
   
   console.log('Serviço de agendamento iniciado.');
+  return true;
 }
 
 // Parar o agendador
@@ -796,8 +809,20 @@ export function removeReminderNotifications(reminderId: string) {
 }
 
 // Listar todas as tarefas agendadas (para visualização no painel)
-export function listScheduledTasks(): ScheduledTask[] {
-  return [...scheduledTasks];
+export function listScheduledTasks() {
+  if (!isNodeEnvironment) {
+    console.log('Ambiente não suportado para listar tarefas');
+    return [];
+  }
+  
+  return scheduledTasks.map(task => ({
+    id: task.id,
+    reminderId: task.reminderId,
+    medicationIndex: task.medicationIndex,
+    scheduledTime: task.scheduledTime instanceof Date ? task.scheduledTime.toISOString() : task.scheduledTime,
+    webhookUrl: task.webhookUrl,
+    webhookSecret: task.webhookSecret ? '[SECRET]' : undefined // não expor o segredo
+  }));
 }
 
 // Verificar se todos os tratamentos foram concluídos
@@ -884,4 +909,16 @@ async function checkReminderCompletion(reminder: Reminder, webhookUrl?: string, 
       console.error(`Erro ao marcar lembrete ${reminder.id || reminder._id} como inativo:`, error);
     }
   }
+}
+
+// Obter status do agendador
+export function getSchedulerStatus() {
+  return {
+    isRunning: !!schedulerInterval,
+    startTime: schedulerStartTime ? schedulerStartTime.toISOString() : null,
+    lastCheck: schedulerLastCheck ? schedulerLastCheck.toISOString() : null,
+    checkInterval: schedulerCheckInterval,
+    scheduledTasksCount: scheduledTasks.length,
+    uniqueRemindersCount: new Set(scheduledTasks.map(t => t.reminderId)).size
+  };
 }
