@@ -45,6 +45,12 @@ export async function GET() {
     tasks.forEach(task => uniqueReminderIds.add(task.reminderId));
     const uniqueRemindersCount = uniqueReminderIds.size;
     
+    // Calcular uptime apenas se startTime existe
+    let uptime = 0;
+    if (schedulerInfo.startTime) {
+      uptime = Math.floor((Date.now() - new Date(schedulerInfo.startTime).getTime()) / 1000);
+    }
+    
     return NextResponse.json({ 
       success: true, 
       message: 'Agendador está ativo',
@@ -53,7 +59,7 @@ export async function GET() {
         lastCheck: schedulerInfo.lastCheck,
         checkInterval: schedulerInfo.checkInterval,
         startTime: schedulerInfo.startTime,
-        uptime: Math.floor((Date.now() - new Date(schedulerInfo.startTime).getTime()) / 1000)
+        uptime: uptime
       },
       stats: {
         totalTasks: tasks.length,
