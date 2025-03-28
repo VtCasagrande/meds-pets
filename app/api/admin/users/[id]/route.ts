@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import dbConnect from '@/app/lib/db';
 import User, { IUser } from '@/app/lib/models/User';
 import bcrypt from 'bcryptjs';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 // Verificar se o usuário é admin
 async function isAdmin() {
@@ -35,7 +35,7 @@ export async function GET(
     
     await dbConnect();
     
-    const user = await User.findById(params.id).select('-password');
+    const user = await User.findById(params.id).select('-password') as IUser & Document;
     
     if (!user) {
       return NextResponse.json(
@@ -80,7 +80,7 @@ export async function PUT(
     await dbConnect();
     
     // Buscar o usuário existente
-    const userExists = await User.findById(params.id);
+    const userExists = await User.findById(params.id) as IUser & Document;
     
     if (!userExists) {
       return NextResponse.json(
