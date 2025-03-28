@@ -55,6 +55,12 @@ export default function Navbar() {
             >
               Logs
             </Link>
+            <Link 
+              href="/scheduler" 
+              className={`px-3 py-2 rounded-md text-sm font-medium hover:bg-blue-700 ${isActive('/scheduler')}`}
+            >
+              Agendador
+            </Link>
           </div>
         </div>
       </div>

@@ -795,19 +795,9 @@ export function removeReminderNotifications(reminderId: string) {
   console.log(`Removidas ${removedCount} notificações agendadas para lembrete ${reminderId}`);
 }
 
-// Listar todas as tarefas agendadas (para depuração)
-export function listScheduledTasks() {
-  if (!isNodeEnvironment) {
-    console.log('Ambiente não suportado para listar tarefas');
-    return [];
-  }
-
-  return scheduledTasks.map(task => ({
-    id: task.id,
-    reminderId: task.reminderId,
-    medicationIndex: task.medicationIndex,
-    scheduledTime: task.scheduledTime.toISOString()
-  }));
+// Listar todas as tarefas agendadas (para visualização no painel)
+export function listScheduledTasks(): ScheduledTask[] {
+  return [...scheduledTasks];
 }
 
 // Verificar se todos os tratamentos foram concluídos
