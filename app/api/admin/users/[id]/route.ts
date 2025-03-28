@@ -46,7 +46,7 @@ export async function GET(
     
     return NextResponse.json({
       user: {
-        id: user._id.toString(),
+        id: user._id instanceof Types.ObjectId ? user._id.toString() : String(user._id),
         name: user.name,
         email: user.email,
         role: user.role,
@@ -128,7 +128,7 @@ export async function PUT(
     return NextResponse.json({
       message: 'Usuário atualizado com sucesso',
       user: {
-        id: updatedUser._id.toString(),
+        id: updatedUser._id instanceof Types.ObjectId ? updatedUser._id.toString() : String(updatedUser._id),
         name: updatedUser.name,
         email: updatedUser.email,
         role: updatedUser.role,

@@ -1,4 +1,7 @@
 import { NextResponse } from 'next/server';
+import dbConnect from '@/app/lib/db';
+import * as scheduler from '@/app/lib/services/schedulerService';
+import { Types } from 'mongoose';
 
 // POST /api/scheduler/resync - Recarregar e reagendar todos os lembretes ativos
 export async function POST() {
@@ -53,7 +56,7 @@ export async function POST() {
     // Reagendar cada lembrete
     for (const reminderDoc of activeReminders) {
       // Verificação de segurança para o _id
-      const id = reminderDoc._id ? reminderDoc._id.toString() : `unknown-${Date.now()}`;
+      const id = reminderDoc._id ? (reminderDoc._id instanceof Types.ObjectId ? reminderDoc._id.toString() : String(reminderDoc._id)) : `unknown-${Date.now()}`;
       
       // Converter documento do MongoDB para o formato Reminder
       const reminder = {

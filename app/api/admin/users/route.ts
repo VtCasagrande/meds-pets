@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     
     // Preparar os dados para a resposta
     const formattedUsers = users.map(user => ({
-      id: (user._id as Types.ObjectId).toString(),
+      id: user._id instanceof Types.ObjectId ? user._id.toString() : String(user._id),
       name: user.name,
       email: user.email,
       role: user.role,
@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       message: 'Usuário criado com sucesso',
       user: {
-        id: newUser._id.toString(),
+        id: newUser._id instanceof Types.ObjectId ? newUser._id.toString() : String(newUser._id),
         name: newUser.name,
         email: newUser.email,
         role: newUser.role,

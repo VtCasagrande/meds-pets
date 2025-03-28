@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import Reminder from '@/app/lib/models/Reminder';
 import { WebhookPayload } from '@/app/lib/types';
+import { Types } from 'mongoose';
 
 // Importar funções do schedulerService apenas em ambiente Node.js
 let scheduleReminderNotifications: (reminder: any, webhookUrl?: string, webhookSecret?: string) => Promise<void> = 
@@ -218,7 +219,7 @@ export async function POST(request: NextRequest) {
         
         // Preparar payload do webhook
         const webhookPayload: WebhookPayload = {
-          reminderId: reminder._id ? reminder._id.toString() : '',
+          reminderId: reminder._id ? (reminder._id instanceof Types.ObjectId ? reminder._id.toString() : String(reminder._id)) : '',
           tutorName: reminder.tutorName,
           petName: reminder.petName,
           petBreed: reminder.petBreed || '',

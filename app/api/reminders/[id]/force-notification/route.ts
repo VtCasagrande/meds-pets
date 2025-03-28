@@ -3,6 +3,7 @@ import dbConnect from '@/app/lib/db';
 import Reminder from '@/app/lib/models/Reminder';
 import { WebhookPayload } from '@/app/lib/types';
 import { removeReminderNotifications } from '@/app/lib/services/schedulerService';
+import { Types } from 'mongoose';
 
 // Função auxiliar para enviar webhook
 async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhookSecret?: string) {
@@ -183,7 +184,7 @@ export async function POST(
     
     // Preparar payload do webhook
     const webhookPayload: WebhookPayload = {
-      reminderId: reminder._id ? reminder._id.toString() : id,
+      reminderId: reminder._id ? (reminder._id instanceof Types.ObjectId ? reminder._id.toString() : String(reminder._id)) : id,
       tutorName: reminder.tutorName,
       petName: reminder.petName,
       petBreed: reminder.petBreed || '',
@@ -252,8 +253,8 @@ export async function POST(
       
       // Garantir que todos os campos necessários estão presentes e com valores válidos
       const reminderForScheduling = {
-        id: reminder._id ? reminder._id.toString() : id,
-        _id: reminder._id ? reminder._id.toString() : id,
+        id: reminder._id ? (reminder._id instanceof Types.ObjectId ? reminder._id.toString() : String(reminder._id)) : id,
+        _id: reminder._id ? (reminder._id instanceof Types.ObjectId ? reminder._id.toString() : String(reminder._id)) : id,
         tutorName: reminderObj.tutorName,
         petName: reminderObj.petName,
         petBreed: reminderObj.petBreed || '',
@@ -266,7 +267,7 @@ export async function POST(
           // Tentar acessar _id de forma segura para documentos do MongoDB
           const productId = typeof product === 'object' && product !== null ? 
             // @ts-ignore - MongoDB adiciona _id que não está no tipo
-            (product._id ? product._id.toString() : product.id) : 
+            (product._id ? (product._id instanceof Types.ObjectId ? product._id.toString() : String(product._id)) : product.id) : 
             undefined;
             
           return {

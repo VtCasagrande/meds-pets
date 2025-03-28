@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import Reminder from '@/app/lib/models/Reminder';
 import { WebhookPayload, WebhookEventType } from '@/app/lib/types';
+import { Types } from 'mongoose';
 
 // POST /api/reminders/webhook - Endpoint para disparar webhook
 export async function POST(request: NextRequest) {
@@ -67,7 +68,7 @@ export async function POST(request: NextRequest) {
     
     // Preparar payload do webhook
     const webhookPayload: WebhookPayload = {
-      reminderId: reminder._id ? reminder._id.toString() : reminderId,
+      reminderId: reminder._id ? (reminder._id instanceof Types.ObjectId ? reminder._id.toString() : String(reminder._id)) : reminderId,
       tutorName: reminder.tutorName,
       petName: reminder.petName,
       petBreed: reminder.petBreed || '',

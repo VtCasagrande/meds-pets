@@ -115,8 +115,8 @@ export async function POST(request: NextRequest) {
 
         await schedulerService.scheduleReminderNotifications(
           {
-            id: reminder._id.toString(),
-            _id: reminder._id.toString(),
+            id: reminder._id instanceof Types.ObjectId ? reminder._id.toString() : String(reminder._id),
+            _id: reminder._id instanceof Types.ObjectId ? reminder._id.toString() : String(reminder._id),
             tutorName: reminder.tutorName,
             petName: reminder.petName,
             petBreed: reminder.petBreed || '',

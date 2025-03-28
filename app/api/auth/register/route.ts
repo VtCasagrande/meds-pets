@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
 import dbConnect from '@/app/lib/db';
 import User, { IUser } from '@/app/lib/models/User';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export async function POST(req: NextRequest) {
   try {
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
     // Retornar resposta sem expor a senha
     const user = {
-      id: newUser._id.toString(),
+      id: newUser._id instanceof Types.ObjectId ? newUser._id.toString() : String(newUser._id),
       name: newUser.name,
       email: newUser.email,
       role: newUser.role,

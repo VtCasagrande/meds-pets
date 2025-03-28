@@ -3,7 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import { compare } from 'bcryptjs';
 import dbConnect from '@/app/lib/db';
 import User, { IUser } from '@/app/lib/models/User';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 const handler = NextAuth({
   providers: [
@@ -34,7 +34,7 @@ const handler = NextAuth({
         }
         
         return {
-          id: user._id.toString(),
+          id: user._id instanceof Types.ObjectId ? user._id.toString() : String(user._id),
           name: user.name,
           email: user.email,
           role: user.role
@@ -53,7 +53,7 @@ const handler = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as string;
+        session.user.role = token.role as 'admin' | 'user';
       }
       return session;
     }

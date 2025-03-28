@@ -1,5 +1,7 @@
 import { Reminder } from '../types';
-import { WebhookPayload } from '../types';
+import { WebhookPayload, WebhookEventType } from '../types';
+import dbConnect from '../db';
+import { Types } from 'mongoose';
 
 // Em um ambiente de produção, isso seria implementado
 // com um sistema de fila real como AWS SQS, RabbitMQ, etc.
@@ -87,8 +89,8 @@ async function checkAllCompletedReminders() {
     // Verificar cada lembrete
     for (const reminderDoc of activeReminders) {
       const reminder: Reminder = {
-        id: reminderDoc._id ? reminderDoc._id.toString() : '',
-        _id: reminderDoc._id ? reminderDoc._id.toString() : '',
+        id: reminderDoc._id ? (reminderDoc._id instanceof Types.ObjectId ? reminderDoc._id.toString() : String(reminderDoc._id)) : '',
+        _id: reminderDoc._id ? (reminderDoc._id instanceof Types.ObjectId ? reminderDoc._id.toString() : String(reminderDoc._id)) : '',
         tutorName: reminderDoc.tutorName,
         petName: reminderDoc.petName,
         petBreed: reminderDoc.petBreed || '',
@@ -590,8 +592,8 @@ async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
     
     // Converter documento do MongoDB para o tipo Reminder
     const reminder: Reminder = {
-      id: reminderDoc._id ? reminderDoc._id.toString() : reminderId,
-      _id: reminderDoc._id ? reminderDoc._id.toString() : reminderId,
+      id: reminderDoc._id ? (reminderDoc._id instanceof Types.ObjectId ? reminderDoc._id.toString() : String(reminderDoc._id)) : reminderId,
+      _id: reminderDoc._id ? (reminderDoc._id instanceof Types.ObjectId ? reminderDoc._id.toString() : String(reminderDoc._id)) : reminderId,
       tutorName: reminderDoc.tutorName,
       petName: reminderDoc.petName,
       petBreed: reminderDoc.petBreed || '',
