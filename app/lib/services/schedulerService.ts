@@ -281,23 +281,91 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
     const status = response.status;
     console.log(`Resposta do webhook: status ${status}, tempo: ${elapsedTime}ms`);
     
+    // Variável para armazenar o texto da resposta
+    let responseText = '';
+    
     // Tentar obter corpo da resposta
     try {
-      const responseText = await response.text();
+      responseText = await response.text();
       if (responseText) {
         console.log(`Resposta do webhook: ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`);
       }
     } catch (textError) {
       console.log('Não foi possível obter texto da resposta');
+      responseText = 'Erro ao obter resposta';
     }
     
-    if (status >= 200 && status < 300) {
+    const success = status >= 200 && status < 300;
+    
+    if (success) {
       console.log(`Webhook ${payload.eventType} enviado com sucesso.`);
     } else {
       console.error(`Erro ao enviar webhook ${payload.eventType}: status ${status}`);
     }
+    
+    // Registrar o log no banco de dados
+    try {
+      // Importar modelo do Mongoose dinamicamente
+      const dbConnectPromise = import('../db').then(module => module.default);
+      const WebhookLogModelPromise = import('../models/WebhookLog').then(module => module.default);
+      
+      // Aguardar importações dinâmicas
+      const [dbConnect, WebhookLogModel] = await Promise.all([dbConnectPromise, WebhookLogModelPromise]);
+      
+      // Conectar ao banco de dados
+      await dbConnect();
+      
+      // Criar registro de log
+      await WebhookLogModel.create({
+        reminderId: payload.reminderId,
+        eventType: payload.eventType,
+        eventDescription: payload.eventDescription,
+        payload: payload,
+        statusCode: status,
+        response: responseText.substring(0, 1000), // Limitar tamanho da resposta
+        success: success,
+        createdAt: new Date()
+      });
+      
+      console.log(`Log de webhook ${payload.eventType} registrado com sucesso.`);
+    } catch (logError) {
+      console.error(`Erro ao registrar log de webhook:`, logError);
+    }
+    
+    return { status, success };
   } catch (error) {
     console.error(`Erro ao enviar webhook ${payload.eventType}:`, error);
+    
+    // Registrar erro no banco de dados
+    try {
+      // Importar modelo do Mongoose dinamicamente
+      const dbConnectPromise = import('../db').then(module => module.default);
+      const WebhookLogModelPromise = import('../models/WebhookLog').then(module => module.default);
+      
+      // Aguardar importações dinâmicas
+      const [dbConnect, WebhookLogModel] = await Promise.all([dbConnectPromise, WebhookLogModelPromise]);
+      
+      // Conectar ao banco de dados
+      await dbConnect();
+      
+      // Criar registro de log de erro
+      await WebhookLogModel.create({
+        reminderId: payload.reminderId,
+        eventType: payload.eventType,
+        eventDescription: payload.eventDescription,
+        payload: payload,
+        statusCode: 0,
+        response: error instanceof Error ? error.message : 'Erro desconhecido',
+        success: false,
+        createdAt: new Date()
+      });
+      
+      console.log(`Log de erro de webhook registrado.`);
+    } catch (logError) {
+      console.error(`Erro ao registrar log de webhook:`, logError);
+    }
+    
+    return { status: 0, success: false };
   }
 }
 

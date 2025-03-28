@@ -51,16 +51,74 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
     const responseStatus = webhookResponse.status;
     console.log(`Resposta do webhook: status ${responseStatus}`);
     
+    let responseData;
+    let responseText = '';
+    
     try {
-      const responseData = await webhookResponse.json();
-      console.log('Dados da resposta:', responseData);
-      return responseData;
+      responseText = await webhookResponse.text();
+      try {
+        responseData = JSON.parse(responseText);
+        console.log('Dados da resposta:', responseData);
+      } catch (e) {
+        console.log('Não foi possível obter dados JSON da resposta');
+        responseData = { status: responseStatus };
+      }
     } catch (e) {
-      console.log('Não foi possível obter dados JSON da resposta');
-      return { status: responseStatus };
+      console.log('Não foi possível obter texto da resposta');
+      responseText = 'Erro ao obter resposta';
+      responseData = { status: responseStatus };
     }
+    
+    const success = responseStatus >= 200 && responseStatus < 300;
+    
+    // Registrar o log no banco de dados
+    try {
+      // Importar modelo do Mongoose dinamicamente
+      const WebhookLogModel = (await import('@/app/lib/models/WebhookLog')).default;
+      
+      // Criar registro de log
+      await WebhookLogModel.create({
+        reminderId: payload.reminderId,
+        eventType: payload.eventType,
+        eventDescription: payload.eventDescription,
+        payload: payload,
+        statusCode: responseStatus,
+        response: responseText.substring(0, 1000), // Limitar tamanho da resposta
+        success: success,
+        createdAt: new Date()
+      });
+      
+      console.log(`Log de webhook ${payload.eventType} registrado com sucesso.`);
+    } catch (logError) {
+      console.error(`Erro ao registrar log de webhook:`, logError);
+    }
+    
+    return responseData;
   } catch (error) {
     console.error('Erro ao enviar webhook:', error);
+    
+    // Registrar erro no banco de dados
+    try {
+      // Importar modelo do Mongoose dinamicamente
+      const WebhookLogModel = (await import('@/app/lib/models/WebhookLog')).default;
+      
+      // Criar registro de log de erro
+      await WebhookLogModel.create({
+        reminderId: payload.reminderId,
+        eventType: payload.eventType,
+        eventDescription: payload.eventDescription,
+        payload: payload,
+        statusCode: 0,
+        response: error instanceof Error ? error.message : 'Erro desconhecido',
+        success: false,
+        createdAt: new Date()
+      });
+      
+      console.log(`Log de erro de webhook registrado.`);
+    } catch (logError) {
+      console.error(`Erro ao registrar log de webhook:`, logError);
+    }
+    
     return null;
   }
 }
@@ -122,6 +180,8 @@ export async function PUT(
     const webhookUrl = body.webhookUrl || process.env.WEBHOOK_URL || '';
     const webhookSecret = body.webhookSecret || process.env.WEBHOOK_SECRET || '';
     
+    console.log(`Configurações de webhook - URL: ${webhookUrl ? webhookUrl : 'não definida'}, Secret: ${webhookSecret ? 'configurado' : 'não configurado'}`);
+    
     console.log('Conectando ao banco de dados...');
     await dbConnect();
     console.log('Conexão estabelecida com sucesso');
@@ -136,6 +196,15 @@ export async function PUT(
         { status: 404 }
       );
     }
+    
+    // Verificar se o lembrete foi desativado ou reativado
+    const wasStatusChanged = existingReminder.isActive !== body.isActive;
+    const actionType = body.isActive ? 'reminder_activated' : 'reminder_deactivated';
+    const actionDescription = body.isActive 
+      ? `Lembrete para ${body.petName} foi reativado` 
+      : `Lembrete para ${body.petName} foi desativado`;
+    
+    console.log(`Status do lembrete ${wasStatusChanged ? 'foi alterado' : 'não foi alterado'}: ${existingReminder.isActive ? 'ativo' : 'inativo'} -> ${body.isActive ? 'ativo' : 'inativo'}`);
     
     // Remover campos do webhook dos dados do lembrete
     const reminderData = { ...body };
@@ -160,8 +229,19 @@ export async function PUT(
     if (updatedReminder && updatedReminder.medicationProducts.length > 0) {
       const firstProduct = updatedReminder.medicationProducts[0];
       
-      // Verificar se o lembrete foi desativado
-      const isDeactivation = existingReminder.isActive === true && updatedReminder.isActive === false;
+      // Determinar o tipo de evento baseado na mudança de status
+      let eventType: 'reminder_updated' | 'reminder_activated' | 'reminder_deactivated';
+      let eventDescription: string;
+      
+      if (wasStatusChanged) {
+        eventType = actionType as 'reminder_activated' | 'reminder_deactivated';
+        eventDescription = actionDescription;
+      } else {
+        eventType = 'reminder_updated';
+        eventDescription = 'Lembrete atualizado';
+      }
+      
+      console.log(`Tipo de evento webhook: ${eventType}, descrição: ${eventDescription}`);
       
       // Preparar payload do webhook
       const webhookPayload: WebhookPayload = {
@@ -170,10 +250,8 @@ export async function PUT(
         petName: updatedReminder.petName,
         petBreed: updatedReminder.petBreed || '',
         phoneNumber: updatedReminder.phoneNumber,
-        eventType: isDeactivation ? 'reminder_deactivated' : 'reminder_updated',
-        eventDescription: isDeactivation 
-          ? `Lembrete para ${updatedReminder.petName} foi desativado` 
-          : 'Lembrete atualizado',
+        eventType: eventType,
+        eventDescription: eventDescription,
         medicationProduct: {
           title: firstProduct.title,
           quantity: firstProduct.quantity,

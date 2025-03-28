@@ -35,7 +35,7 @@ export type RemindersState = {
 }
 
 // Tipos para webhooks
-export type WebhookEventType = 'reminder_created' | 'reminder_updated' | 'reminder_notification' | 'reminder_finished' | 'reminder_deactivated' | 'reminder_deleted';
+export type WebhookEventType = 'reminder_created' | 'reminder_updated' | 'reminder_notification' | 'reminder_finished' | 'reminder_deactivated' | 'reminder_deleted' | 'reminder_activated';
 
 export type WebhookPayload = {
   reminderId: string;
