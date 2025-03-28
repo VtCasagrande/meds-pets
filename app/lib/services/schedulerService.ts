@@ -236,7 +236,7 @@ async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
         
         return {
           // O campo id pode não existir no modelo Mongoose
-          id: product._id ? product._id.toString() : undefined,
+          id: product.id || undefined,
           title: product.title,
           quantity: product.quantity,
           frequency: product.frequency || '',
@@ -248,8 +248,8 @@ async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
           endDateTime: formatDateSafe(product.endDateTime)
         };
       }),
-      createdAt: reminderDoc.createdAt,
-      updatedAt: reminderDoc.updatedAt
+      createdAt: formatDateSafe(reminderDoc.createdAt),
+      updatedAt: formatDateSafe(reminderDoc.updatedAt)
     };
     
     return reminder;
@@ -393,4 +393,4 @@ export function listScheduledTasks() {
     medicationIndex: task.medicationIndex,
     scheduledTime: task.scheduledTime.toISOString()
   }));
-} 
+}

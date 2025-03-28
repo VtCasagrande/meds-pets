@@ -2,6 +2,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 
 // Interface para o produto/medicamento
 export interface IMedicationProduct {
+  id?: string;
   title: string;
   quantity: string;
   frequency: string;
