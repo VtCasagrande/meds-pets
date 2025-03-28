@@ -237,6 +237,12 @@ async function executeTask(task: ScheduledTask) {
     console.log(`Executando tarefa para medicamento: ${medicationProduct.title}`);
     console.log(`Detalhes da frequência: ${medicationProduct.frequencyValue} ${medicationProduct.frequencyUnit}`);
     
+    // Obter as configurações de webhook do lembrete ou da tarefa
+    const webhookUrl = reminder.webhookUrl || task.webhookUrl;
+    const webhookSecret = reminder.webhookSecret || task.webhookSecret;
+    
+    console.log(`Configurações de webhook do lembrete - URL: ${webhookUrl || 'não configurada'}, Secret: ${webhookSecret ? 'configurado' : 'não configurado'}`);
+    
     // Preparar payload do webhook
     const webhookPayload: WebhookPayload = {
       reminderId: reminder.id || reminder._id || task.reminderId,
@@ -259,7 +265,13 @@ async function executeTask(task: ScheduledTask) {
     };
     
     // Enviar webhook
-    await sendWebhook(webhookPayload, task.webhookUrl, task.webhookSecret);
+    if (webhookUrl) {
+      console.log(`Enviando webhook de notificação para ${webhookUrl}`);
+      await sendWebhook(webhookPayload, webhookUrl, webhookSecret);
+      console.log(`Webhook enviado com sucesso para a frequência ${medicationProduct.frequencyValue} ${medicationProduct.frequencyUnit}`);
+    } else {
+      console.log('URL de webhook não configurada, pulando envio de notificação');
+    }
     
     console.log(`Tarefa ${task.id} executada com sucesso.`);
     
@@ -308,14 +320,14 @@ async function executeTask(task: ScheduledTask) {
       // Gerar ID único para a tarefa
       const taskId = `${reminder.id || reminder._id}_${task.medicationIndex}_${Date.now()}`;
       
-      // Adicionar à lista de tarefas agendadas
+      // Adicionar à lista de tarefas agendadas com as configurações de webhook do lembrete
       scheduledTasks.push({
         id: taskId,
         reminderId: reminder.id || reminder._id || '',
         medicationIndex: task.medicationIndex,
         scheduledTime: nextNotificationTime,
-        webhookUrl: task.webhookUrl,
-        webhookSecret: task.webhookSecret
+        webhookUrl: webhookUrl,
+        webhookSecret: webhookSecret
       });
       
       console.log(`Próxima notificação agendada para ${nextNotificationTime.toISOString()} (medicamento ${medicationProduct.title})`);
@@ -323,7 +335,7 @@ async function executeTask(task: ScheduledTask) {
     }
     
     // Verificar se todos os tratamentos foram concluídos
-    await checkReminderCompletion(reminder, task.webhookUrl, task.webhookSecret);
+    await checkReminderCompletion(reminder, webhookUrl, webhookSecret);
   } catch (error) {
     console.error(`Erro ao executar tarefa ${task.id}:`, error);
   }
@@ -332,8 +344,9 @@ async function executeTask(task: ScheduledTask) {
 // Enviar webhook
 async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhookSecret?: string) {
   if (!webhookUrl) {
-    console.log('Nenhuma URL de webhook configurada, ignorando envio.');
-    return;
+    console.warn('⚠️ Nenhuma URL de webhook configurada para o lembrete, não será possível enviar a notificação!');
+    console.warn('Configure a URL do webhook na página de configurações ou diretamente no objeto do lembrete.');
+    return { status: 0, success: false, message: 'Nenhuma URL de webhook configurada' };
   }
   
   try {
@@ -348,9 +361,12 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
     if (webhookSecret) {
       headers['X-Webhook-Secret'] = webhookSecret;
       console.log('Webhook Secret configurado no header');
+    } else {
+      console.log('Nenhum Webhook Secret configurado (opcional)');
     }
     
     // Enviar webhook
+    console.log(`Iniciando requisição POST para ${webhookUrl}...`);
     const startTime = Date.now();
     const response = await fetch(webhookUrl, {
       method: 'POST',
@@ -360,7 +376,7 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
     
     const elapsedTime = Date.now() - startTime;
     const status = response.status;
-    console.log(`Resposta do webhook: status ${status}, tempo: ${elapsedTime}ms`);
+    console.log(`✅ Resposta do webhook recebida: status ${status}, tempo: ${elapsedTime}ms`);
     
     // Variável para armazenar o texto da resposta
     let responseText = '';
@@ -372,16 +388,17 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
         console.log(`Resposta do webhook: ${responseText.substring(0, 200)}${responseText.length > 200 ? '...' : ''}`);
       }
     } catch (textError) {
-      console.log('Não foi possível obter texto da resposta');
+      console.error('Não foi possível obter texto da resposta:', textError);
       responseText = 'Erro ao obter resposta';
     }
     
     const success = status >= 200 && status < 300;
     
     if (success) {
-      console.log(`Webhook ${payload.eventType} enviado com sucesso.`);
+      console.log(`✅ Webhook ${payload.eventType} enviado com sucesso para ${webhookUrl}.`);
     } else {
-      console.error(`Erro ao enviar webhook ${payload.eventType}: status ${status}`);
+      console.error(`❌ Erro ao enviar webhook ${payload.eventType}: status ${status}`);
+      console.error(`Resposta: ${responseText}`);
     }
     
     // Registrar o log no banco de dados
@@ -408,14 +425,17 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
         createdAt: new Date()
       });
       
-      console.log(`Log de webhook ${payload.eventType} registrado com sucesso.`);
+      console.log(`📝 Log de webhook ${payload.eventType} registrado com sucesso.`);
     } catch (logError) {
       console.error(`Erro ao registrar log de webhook:`, logError);
     }
     
-    return { status, success };
+    return { status, success, message: responseText };
   } catch (error) {
-    console.error(`Erro ao enviar webhook ${payload.eventType}:`, error);
+    console.error(`❌ Erro ao enviar webhook ${payload.eventType}:`, error);
+    
+    const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
+    console.error(`Detalhes do erro: ${errorMessage}`);
     
     // Registrar erro no banco de dados
     try {
@@ -436,17 +456,17 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
         eventDescription: payload.eventDescription,
         payload: payload,
         statusCode: 0,
-        response: error instanceof Error ? error.message : 'Erro desconhecido',
+        response: errorMessage,
         success: false,
         createdAt: new Date()
       });
       
-      console.log(`Log de erro de webhook registrado.`);
+      console.log(`📝 Log de erro de webhook registrado.`);
     } catch (logError) {
       console.error(`Erro ao registrar log de webhook:`, logError);
     }
     
-    return { status: 0, success: false };
+    return { status: 0, success: false, message: errorMessage };
   }
 }
 
@@ -540,14 +560,25 @@ export async function scheduleReminderNotifications(
     return;
   }
   
+  // Priorizar as configurações de webhook do próprio lembrete
+  const finalWebhookUrl = reminder.webhookUrl || webhookUrl;
+  const finalWebhookSecret = reminder.webhookSecret || webhookSecret;
+  
   console.log(`Agendando notificações para lembrete ${reminder.id || reminder._id}`);
+  console.log(`Configurações de webhook - URL: ${finalWebhookUrl || 'não configurada'}, Secret: ${finalWebhookSecret ? 'configurado' : 'não configurado'}`);
   
   // Agendar notificações para cada medicamento
   reminder.medicationProducts.forEach((product, index) => {
-    scheduleNextNotification(reminder, index, webhookUrl, webhookSecret);
+    console.log(`Agendando notificação para medicamento ${index + 1}: ${product.title}`);
+    scheduleNextNotification(reminder, index, finalWebhookUrl, finalWebhookSecret);
   });
   
   console.log(`Notificações agendadas com sucesso para lembrete ${reminder.id || reminder._id}`);
+  
+  // Se não tiver URL de webhook configurada, exibir alerta
+  if (!finalWebhookUrl) {
+    console.warn(`⚠️ ALERTA: Lembrete ${reminder.id || reminder._id} não possui URL de webhook configurada. As notificações serão agendadas, mas nenhum webhook será enviado.`);
+  }
 }
 
 // Agendar próxima notificação para um medicamento
@@ -564,6 +595,12 @@ function scheduleNextNotification(
     console.log(`Não é possível agendar para o produto ${product.title}: data de início não definida ou lembrete inativo`);
     return;
   }
+  
+  // Priorizar o webhookUrl e webhookSecret do lembrete, se disponíveis
+  const finalWebhookUrl = reminder.webhookUrl || webhookUrl;
+  const finalWebhookSecret = reminder.webhookSecret || webhookSecret;
+  
+  console.log(`Configurações de webhook para agendamento - URL: ${finalWebhookUrl || 'não configurada'}, Secret: ${finalWebhookSecret ? 'configurado' : 'não configurado'}`);
   
   const startDate = new Date(product.startDateTime);
   const now = new Date();
@@ -666,11 +703,12 @@ function scheduleNextNotification(
     reminderId: reminder.id || reminder._id || '',
     medicationIndex,
     scheduledTime: nextNotificationTime,
-    webhookUrl,
-    webhookSecret
+    webhookUrl: finalWebhookUrl,
+    webhookSecret: finalWebhookSecret
   });
   
   console.log(`Tarefa ${taskId} agendada para ${nextNotificationTime.toISOString()} (medicamento ${product.title})`);
+  console.log(`Webhook será enviado para: ${finalWebhookUrl || 'URL não configurada'}`);
 }
 
 // Remover todas as notificações agendadas para um lembrete

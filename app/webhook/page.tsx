@@ -117,6 +117,51 @@ export default function WebhookConfigPage() {
       return;
     }
     
+    try {
+      setIsSaving(true);
+      setError(null);
+      
+      // Enviar uma solicitação para o endpoint de teste de webhook
+      const response = await fetch('/api/webhooks/test', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          webhookUrl,
+          webhookSecret
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Erro ao testar webhook: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      console.log('Resultado do teste de webhook:', result);
+      
+      if (result.success) {
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+      } else {
+        throw new Error(result.message || 'Teste de webhook falhou');
+      }
+    } catch (error) {
+      console.error('Erro ao testar webhook:', error);
+      setError(error instanceof Error ? error.message : 'Erro ao testar webhook. Verifique o console para mais detalhes.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  // Testar configuração de webhook com um lembrete específico
+  const testReminderWebhook = async () => {
+    if (!webhookUrl) {
+      setError('Configure uma URL de webhook antes de testar.');
+      return;
+    }
+    
     if (reminders.length === 0) {
       setError('Não há lembretes ativos para testar o webhook.');
       return;
@@ -130,34 +175,32 @@ export default function WebhookConfigPage() {
       const testReminder = reminders[0];
       const medicationIndex = 0;
       
-      // Enviar uma solicitação de webhook de teste
-      const response = await fetch('/api/reminders/webhook', {
+      // Enviar uma solicitação de webhook de teste usando o lembrete
+      const response = await fetch(`/api/reminders/${testReminder.id}/force-notification`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          reminderId: testReminder.id,
           medicationIndex,
           webhookUrl,
-          webhookSecret,
-          eventType: 'reminder_test',
-          eventDescription: 'Teste de webhook'
+          webhookSecret
         })
       });
       
       if (!response.ok) {
-        throw new Error(`Erro ao testar webhook: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Erro ao testar notificação: ${response.status}`);
       }
       
       const result = await response.json();
-      console.log('Resultado do teste:', result);
+      console.log('Resultado do teste com lembrete:', result);
       
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
-      console.error('Erro ao testar webhook:', error);
-      setError('Erro ao testar webhook. Verifique o console para mais detalhes.');
+      console.error('Erro ao testar notificação de lembrete:', error);
+      setError(error instanceof Error ? error.message : 'Erro ao testar webhook com lembrete. Verifique o console para mais detalhes.');
     } finally {
       setIsSaving(false);
     }
@@ -266,7 +309,15 @@ export default function WebhookConfigPage() {
             disabled={isSaving || !webhookUrl}
             className="px-4 py-2 bg-green-500 text-white font-medium rounded-md hover:bg-green-600 disabled:opacity-50"
           >
-            Testar Webhook
+            Testar Conexão
+          </button>
+
+          <button
+            onClick={testReminderWebhook}
+            disabled={isSaving || !webhookUrl || reminders.length === 0}
+            className="px-4 py-2 bg-yellow-500 text-white font-medium rounded-md hover:bg-yellow-600 disabled:opacity-50 flex items-center"
+          >
+            <span>Testar com Lembrete</span>
           </button>
           
           <button

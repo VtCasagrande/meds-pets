@@ -24,6 +24,8 @@ export interface IReminder extends Document {
   phoneNumber: string;
   medicationProducts: IMedicationProduct[];
   isActive: boolean;
+  webhookUrl?: string;
+  webhookSecret?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -51,6 +53,8 @@ const ReminderSchema = new Schema({
   phoneNumber: { type: String, required: true },
   medicationProducts: [MedicationProductSchema],
   isActive: { type: Boolean, default: true },
+  webhookUrl: { type: String, required: false },
+  webhookSecret: { type: String, required: false },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });
