@@ -17,10 +17,17 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate');
     const success = searchParams.get('success');
     
+    console.log(`Parâmetros de busca: page=${page}, limit=${limit}, reminderId=${reminderId || 'null'}, eventType=${eventType || 'null'}, success=${success || 'null'}`);
+    
     // Conectar ao MongoDB
     console.log('Conectando ao banco de dados...');
     await dbConnect();
     console.log('Conexão estabelecida com sucesso');
+    
+    // Verificar se o modelo WebhookLog existe
+    const modelNames = Object.keys(WebhookLog.db.models);
+    console.log(`Modelos disponíveis: ${modelNames.join(', ')}`);
+    console.log(`Modelo WebhookLog existe: ${modelNames.includes('WebhookLog')}`);
     
     // Construir filtro
     const filter: any = {};
@@ -50,11 +57,15 @@ export async function GET(request: NextRequest) {
       }
     }
     
+    console.log(`Filtro aplicado: ${JSON.stringify(filter)}`);
+    
     // Calcular skip para paginação
     const skip = (page - 1) * limit;
     
     // Buscar total de registros para paginação
+    console.log('Contando total de registros...');
     const total = await WebhookLog.countDocuments(filter);
+    console.log(`Total de registros: ${total}`);
     
     // Buscar logs de webhook com paginação
     console.log('Buscando logs de webhook...');
@@ -64,10 +75,13 @@ export async function GET(request: NextRequest) {
       .limit(limit);
     
     console.log(`Encontrados ${logs.length} logs de webhook`);
+    console.log(`Exemplo do primeiro log: ${logs.length > 0 ? JSON.stringify(logs[0]) : 'nenhum'}`);
     
     // Calcular informações de paginação
     const totalPages = Math.ceil(total / limit);
     
+    // Retornar resposta
+    console.log(`Retornando ${logs.length} logs de webhook com informações de paginação`);
     return NextResponse.json({
       logs,
       pagination: {
@@ -88,6 +102,58 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json(
       { error: 'Erro ao buscar logs de webhook' },
+      { status: 500 }
+    );
+  }
+}
+
+// POST /api/webhook-logs - Criar um log de teste
+export async function POST(request: NextRequest) {
+  console.log('POST /api/webhook-logs - Criando log de teste');
+  
+  try {
+    // Conectar ao MongoDB
+    console.log('Conectando ao banco de dados...');
+    await dbConnect();
+    console.log('Conexão estabelecida com sucesso');
+    
+    // Criar um log de teste
+    const testLog = await WebhookLog.create({
+      reminderId: 'test-' + Date.now(),
+      eventType: 'test_event',
+      eventDescription: 'Este é um log de teste',
+      payload: { test: true, date: new Date().toISOString() },
+      statusCode: 200,
+      response: 'Resposta de teste',
+      success: true,
+      createdAt: new Date()
+    });
+    
+    console.log(`Log de teste criado com sucesso, ID: ${testLog._id}`);
+    
+    // Buscar o log criado para confirmar
+    const fetchedLog = await WebhookLog.findById(testLog._id);
+    
+    if (fetchedLog) {
+      console.log('Log de teste encontrado na base de dados');
+    } else {
+      console.error('Log de teste NÃO encontrado na base de dados após criação!');
+    }
+    
+    return NextResponse.json({
+      success: true,
+      message: 'Log de teste criado com sucesso',
+      log: testLog
+    });
+  } catch (error) {
+    console.error('Erro ao criar log de teste:', error);
+    if (error instanceof Error) {
+      console.error('Detalhes do erro:', error.message);
+      console.error('Stack trace:', error.stack);
+    }
+    
+    return NextResponse.json(
+      { error: 'Erro ao criar log de teste', details: error instanceof Error ? error.message : 'Erro desconhecido' },
       { status: 500 }
     );
   }

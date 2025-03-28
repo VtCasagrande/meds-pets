@@ -1,5 +1,7 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
+console.log('Inicializando modelo WebhookLog...');
+
 // Interface para o log de webhook
 export interface IWebhookLog extends Document {
   reminderId: string;
@@ -25,7 +27,22 @@ const WebhookLogSchema = new Schema({
 });
 
 // Garantir que o modelo seja criado apenas uma vez
-const WebhookLog: Model<IWebhookLog> = mongoose.models.WebhookLog || 
-  mongoose.model<IWebhookLog>('WebhookLog', WebhookLogSchema);
+let WebhookLog: Model<IWebhookLog>;
+
+try {
+  // Verificar se o modelo já existe
+  if (mongoose.models && mongoose.models.WebhookLog) {
+    console.log('Modelo WebhookLog já existente, reutilizando...');
+    WebhookLog = mongoose.models.WebhookLog as Model<IWebhookLog>;
+  } else {
+    console.log('Criando novo modelo WebhookLog...');
+    WebhookLog = mongoose.model<IWebhookLog>('WebhookLog', WebhookLogSchema);
+    console.log('Modelo WebhookLog criado com sucesso.');
+  }
+} catch (error) {
+  console.error('Erro ao inicializar modelo WebhookLog:', error);
+  // Fallback em caso de erro
+  WebhookLog = mongoose.models.WebhookLog || mongoose.model<IWebhookLog>('WebhookLog', WebhookLogSchema);
+}
 
 export default WebhookLog; 

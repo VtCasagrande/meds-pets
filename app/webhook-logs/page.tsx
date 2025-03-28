@@ -38,6 +38,8 @@ export default function WebhookLogsPage() {
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [page, setPage] = useState(1);
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  const [isCreatingTestLog, setIsCreatingTestLog] = useState(false);
+  const [testLogResult, setTestLogResult] = useState<{ success: boolean; message: string } | null>(null);
   const [filters, setFilters] = useState({
     reminderId: '',
     eventType: '',
@@ -137,9 +139,67 @@ export default function WebhookLogsPage() {
     'reminder_deleted': 'Lembrete excluído'
   };
 
+  // Função para criar um log de teste
+  const createTestLog = async () => {
+    setIsCreatingTestLog(true);
+    setTestLogResult(null);
+    
+    try {
+      const response = await fetch('/api/webhook-logs', {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Erro ao criar log de teste: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setTestLogResult({
+        success: true,
+        message: 'Log de teste criado com sucesso!'
+      });
+      
+      // Atualizar a lista de logs
+      fetchLogs();
+    } catch (err) {
+      console.error('Erro ao criar log de teste:', err);
+      setTestLogResult({
+        success: false,
+        message: err instanceof Error ? err.message : 'Erro desconhecido'
+      });
+    } finally {
+      setIsCreatingTestLog(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Logs de Webhook</h1>
+      
+      <div className="flex justify-between items-center mb-4">
+        <div>
+          <button
+            onClick={createTestLog}
+            disabled={isCreatingTestLog}
+            className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 mb-2"
+          >
+            {isCreatingTestLog ? 'Criando...' : 'Criar Log de Teste'}
+          </button>
+          
+          {testLogResult && (
+            <span className={`ml-3 px-3 py-1 rounded text-sm ${testLogResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+              {testLogResult.message}
+            </span>
+          )}
+        </div>
+        
+        <button
+          onClick={() => fetchLogs()}
+          className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+        >
+          Atualizar Logs
+        </button>
+      </div>
       
       <form onSubmit={handleFilterSubmit} className="mb-6 bg-gray-50 p-4 rounded-lg shadow-sm">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

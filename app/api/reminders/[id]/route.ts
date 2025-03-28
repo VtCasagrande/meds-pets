@@ -29,9 +29,10 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
     return null;
   }
   
+  console.log(`Iniciando envio de webhook (${payload.eventType}) para URL: ${webhookUrl}`);
+  console.log(`Payload do webhook: ${JSON.stringify(payload)}`);
+  
   try {
-    console.log(`Enviando webhook para URL: ${webhookUrl}`);
-    
     // Configurar headers para incluir a chave secreta, se fornecida
     const headers: HeadersInit = {
       'Content-Type': 'application/json'
@@ -39,23 +40,32 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
     
     if (webhookSecret) {
       headers['X-Webhook-Secret'] = webhookSecret;
+      console.log('Header X-Webhook-Secret configurado');
     }
     
     // Enviar o webhook para a URL configurada
+    console.log(`Enviando requisição POST para ${webhookUrl}...`);
+    const startTime = Date.now();
+    
     const webhookResponse = await fetch(webhookUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload)
     });
     
+    const endTime = Date.now();
+    const duration = endTime - startTime;
+    
     const responseStatus = webhookResponse.status;
-    console.log(`Resposta do webhook: status ${responseStatus}`);
+    console.log(`Resposta do webhook: status ${responseStatus}, tempo: ${duration}ms`);
     
     let responseData;
     let responseText = '';
     
     try {
       responseText = await webhookResponse.text();
+      console.log(`Texto da resposta: ${responseText}`);
+      
       try {
         responseData = JSON.parse(responseText);
         console.log('Dados da resposta:', responseData);
@@ -74,10 +84,13 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
     // Registrar o log no banco de dados
     try {
       // Importar modelo do Mongoose dinamicamente
+      console.log('Importando modelo WebhookLog...');
       const WebhookLogModel = (await import('@/app/lib/models/WebhookLog')).default;
+      console.log('Modelo WebhookLog importado com sucesso');
       
       // Criar registro de log
-      await WebhookLogModel.create({
+      console.log('Criando registro de log no banco de dados...');
+      const logEntry = await WebhookLogModel.create({
         reminderId: payload.reminderId,
         eventType: payload.eventType,
         eventDescription: payload.eventDescription,
@@ -88,22 +101,29 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
         createdAt: new Date()
       });
       
-      console.log(`Log de webhook ${payload.eventType} registrado com sucesso.`);
+      console.log(`Log de webhook ${payload.eventType} registrado com sucesso. ID: ${logEntry._id}`);
+      
+      // Verificar se o log foi realmente salvo
+      const savedLog = await WebhookLogModel.findById(logEntry._id);
+      console.log(`Verificação de log salvo: ${savedLog ? 'encontrado' : 'não encontrado'}`);
     } catch (logError) {
       console.error(`Erro ao registrar log de webhook:`, logError);
     }
     
     return responseData;
   } catch (error) {
-    console.error('Erro ao enviar webhook:', error);
+    console.error(`ERRO ao enviar webhook: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    console.error('Stack trace:', error instanceof Error ? error.stack : 'Sem stack trace');
     
     // Registrar erro no banco de dados
     try {
       // Importar modelo do Mongoose dinamicamente
+      console.log('Importando modelo WebhookLog para registro de erro...');
       const WebhookLogModel = (await import('@/app/lib/models/WebhookLog')).default;
       
       // Criar registro de log de erro
-      await WebhookLogModel.create({
+      console.log('Criando registro de log de erro no banco de dados...');
+      const logEntry = await WebhookLogModel.create({
         reminderId: payload.reminderId,
         eventType: payload.eventType,
         eventDescription: payload.eventDescription,
@@ -114,7 +134,7 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
         createdAt: new Date()
       });
       
-      console.log(`Log de erro de webhook registrado.`);
+      console.log(`Log de erro de webhook registrado. ID: ${logEntry._id}`);
     } catch (logError) {
       console.error(`Erro ao registrar log de webhook:`, logError);
     }
@@ -177,8 +197,18 @@ export async function PUT(
     
     // Extrair a URL e chave secreta do webhook, se fornecidas
     // Ou usar as configurações de ambiente como fallback
-    const webhookUrl = body.webhookUrl || process.env.WEBHOOK_URL || '';
+    let webhookUrl = body.webhookUrl || process.env.WEBHOOK_URL || '';
     const webhookSecret = body.webhookSecret || process.env.WEBHOOK_SECRET || '';
+    
+    // Se não houver URL configurada, usar uma URL de teste do webhook.site para depuração
+    if (!webhookUrl) {
+      webhookUrl = 'https://webhook.site/2183e9be-ce1f-400d-bd28-c589a1938b44';
+      console.log(`Usando URL de webhook de teste: ${webhookUrl}`);
+    }
+    
+    console.log(`Variáveis de ambiente para webhook:
+    - process.env.WEBHOOK_URL: ${process.env.WEBHOOK_URL ? 'definida' : 'não definida'}
+    - process.env.WEBHOOK_SECRET: ${process.env.WEBHOOK_SECRET ? 'definido' : 'não definido'}`);
     
     console.log(`Configurações de webhook - URL: ${webhookUrl ? webhookUrl : 'não definida'}, Secret: ${webhookSecret ? 'configurado' : 'não configurado'}`);
     
