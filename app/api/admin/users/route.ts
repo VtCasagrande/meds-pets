@@ -95,9 +95,9 @@ export async function POST(req: NextRequest) {
     }
     
     // Validar o papel (role) do usuário
-    if (role && !['admin', 'user'].includes(role)) {
+    if (role && !['creator', 'admin', 'user'].includes(role)) {
       return NextResponse.json(
-        { message: 'Função inválida. Use "admin" ou "user"' },
+        { message: 'Função inválida. Use "creator", "admin" ou "user"' },
         { status: 400 }
       );
     }

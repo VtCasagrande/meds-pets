@@ -26,6 +26,7 @@ export interface IReminder extends Document {
   isActive: boolean;
   webhookUrl?: string;
   webhookSecret?: string;
+  createdBy?: Schema.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -55,6 +56,7 @@ const ReminderSchema = new Schema({
   isActive: { type: Boolean, default: true },
   webhookUrl: { type: String, required: false },
   webhookSecret: { type: String, required: false },
+  createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: false },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

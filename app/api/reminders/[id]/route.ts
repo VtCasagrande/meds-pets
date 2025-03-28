@@ -3,6 +3,7 @@ import dbConnect from '@/app/lib/db';
 import Reminder from '@/app/lib/models/Reminder';
 import { WebhookPayload } from '@/app/lib/types';
 import { Types } from 'mongoose';
+import { getCurrentUserId, getCurrentUserRole, requireAuth } from '@/app/lib/auth';
 
 // Importar funções do schedulerService apenas em ambiente Node.js
 let scheduleReminderNotifications: (reminder: any, webhookUrl?: string, webhookSecret?: string) => Promise<void> = 
@@ -153,6 +154,10 @@ export async function GET(
   console.log(`GET /api/reminders/${id} - Buscando detalhes do lembrete`);
   
   try {
+    // Verificar autenticação
+    const authError = await requireAuth(request);
+    if (authError) return authError;
+    
     console.log('Conectando ao banco de dados...');
     await dbConnect();
     console.log('Conexão estabelecida com sucesso');
@@ -165,6 +170,18 @@ export async function GET(
       return NextResponse.json(
         { error: 'Lembrete não encontrado' },
         { status: 404 }
+      );
+    }
+    
+    // Verificar permissões - usuários comuns só podem ver seus próprios lembretes
+    const userId = await getCurrentUserId();
+    const userRole = await getCurrentUserRole();
+    
+    if (userRole === 'user' && reminder.createdBy && reminder.createdBy.toString() !== userId) {
+      console.log(`Acesso negado: Usuário ${userId} tentando acessar lembrete de outro usuário`);
+      return NextResponse.json(
+        { error: 'Acesso negado. Você não tem permissão para visualizar este lembrete.' },
+        { status: 403 }
       );
     }
     
@@ -193,6 +210,10 @@ export async function PUT(
   console.log(`PUT /api/reminders/${id} - Atualizando lembrete`);
   
   try {
+    // Verificar autenticação
+    const authError = await requireAuth(request);
+    if (authError) return authError;
+    
     const body = await request.json();
     console.log('Dados recebidos:', JSON.stringify(body, null, 2));
     
@@ -225,6 +246,18 @@ export async function PUT(
       return NextResponse.json(
         { error: 'Lembrete não encontrado' },
         { status: 404 }
+      );
+    }
+    
+    // Verificar permissões - usuários comuns só podem editar seus próprios lembretes
+    const userId = await getCurrentUserId();
+    const userRole = await getCurrentUserRole();
+    
+    if (userRole === 'user' && existingReminder.createdBy && existingReminder.createdBy.toString() !== userId) {
+      console.log(`Acesso negado: Usuário ${userId} tentando editar lembrete de outro usuário`);
+      return NextResponse.json(
+        { error: 'Acesso negado. Você não tem permissão para editar este lembrete.' },
+        { status: 403 }
       );
     }
     
@@ -329,6 +362,10 @@ export async function DELETE(
   console.log(`DELETE /api/reminders/${id} - Removendo lembrete`);
   
   try {
+    // Verificar autenticação
+    const authError = await requireAuth(request);
+    if (authError) return authError;
+    
     console.log('Conectando ao banco de dados...');
     await dbConnect();
     console.log('Conexão estabelecida com sucesso');
@@ -341,6 +378,18 @@ export async function DELETE(
       return NextResponse.json(
         { error: 'Lembrete não encontrado' },
         { status: 404 }
+      );
+    }
+    
+    // Verificar permissões - usuários comuns só podem excluir seus próprios lembretes
+    const userId = await getCurrentUserId();
+    const userRole = await getCurrentUserRole();
+    
+    if (userRole === 'user' && reminder.createdBy && reminder.createdBy.toString() !== userId) {
+      console.log(`Acesso negado: Usuário ${userId} tentando excluir lembrete de outro usuário`);
+      return NextResponse.json(
+        { error: 'Acesso negado. Você não tem permissão para excluir este lembrete.' },
+        { status: 403 }
       );
     }
     

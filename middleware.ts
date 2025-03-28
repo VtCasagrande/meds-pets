@@ -7,14 +7,19 @@ import { getToken } from 'next-auth/jwt';
 const protectedRoutes = [
   '/reminders/new',
   '/reminders/[id]/edit',
-  '/webhook',
-  '/webhook-logs',
-  '/scheduler',
+  '/profile',
+  '/permissions',
 ];
 
 // Rotas que requerem permissão de administrador
 const adminRoutes = [
   '/admin',
+];
+
+// Rotas que requerem permissão de criador
+const creatorRoutes = [
+  '/webhook',
+  '/webhook-logs',
   '/scheduler',
 ];
 
@@ -37,8 +42,13 @@ export async function middleware(request: NextRequest) {
     return pathname === route || pathname.startsWith(`${route}/`);
   });
   
-  // Se não for uma rota protegida, continuar
-  if (!isProtectedRoute && !isAdminRoute) {
+  // Verificar se é uma rota exclusiva do criador
+  const isCreatorRoute = creatorRoutes.some(route => {
+    return pathname === route || pathname.startsWith(`${route}/`);
+  });
+  
+  // Se não for nenhum tipo de rota restrita, continuar
+  if (!isProtectedRoute && !isAdminRoute && !isCreatorRoute) {
     return NextResponse.next();
   }
   
@@ -48,16 +58,26 @@ export async function middleware(request: NextRequest) {
     secret: process.env.NEXTAUTH_SECRET,
   });
   
-  // Se não estiver autenticado e for uma rota protegida, redirecionar para o login
-  if (!token && isProtectedRoute) {
+  // Adicionar tipagem ao token para incluir o papel "creator"
+  type UserRole = 'user' | 'admin' | 'creator' | undefined;
+  const userRole = token?.role as UserRole;
+  
+  // Se não estiver autenticado e for qualquer tipo de rota protegida, redirecionar para o login
+  if (!token && (isProtectedRoute || isAdminRoute || isCreatorRoute)) {
     const url = new URL('/auth/login', request.url);
     url.searchParams.set('callbackUrl', encodeURI(request.url));
     return NextResponse.redirect(url);
   }
   
-  // Se for uma rota de administrador, verificar se o usuário é administrador
-  if (isAdminRoute && token?.role !== 'admin') {
-    // Se não for administrador, redirecionar para a página inicial
+  // Se for uma rota de administrador, verificar se o usuário é administrador ou criador
+  if (isAdminRoute && userRole !== 'admin' && userRole !== 'creator') {
+    // Se não for administrador ou criador, redirecionar para a página inicial
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+  
+  // Se for uma rota exclusiva do criador, verificar se o usuário é criador
+  if (isCreatorRoute && userRole !== 'creator') {
+    // Se não for criador, redirecionar para a página inicial
     return NextResponse.redirect(new URL('/', request.url));
   }
   

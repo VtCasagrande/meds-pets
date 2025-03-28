@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import WebhookLog from '@/app/lib/models/WebhookLog';
+import { requireCreator } from '@/app/lib/auth';
 
-// GET /api/webhook-logs - Listar todos os logs de webhook
+// GET /api/webhook-logs - Listar todos os logs de webhook (somente criador)
 export async function GET(request: NextRequest) {
   console.log('GET /api/webhook-logs - Iniciando busca de logs de webhook');
   
   try {
+    // Verificar permissão - apenas o criador pode acessar logs de webhook
+    const authError = await requireCreator(request);
+    if (authError) return authError;
+    
     // Obter parâmetros de consulta
     const searchParams = request.nextUrl.searchParams;
     const page = parseInt(searchParams.get('page') || '1');
@@ -107,11 +112,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/webhook-logs - Criar um log de teste
+// POST /api/webhook-logs - Criar um log de teste (somente criador)
 export async function POST(request: NextRequest) {
   console.log('POST /api/webhook-logs - Criando log de teste');
   
   try {
+    // Verificar permissão - apenas o criador pode criar logs de teste
+    const authError = await requireCreator(request);
+    if (authError) return authError;
+    
     // Conectar ao MongoDB
     console.log('Conectando ao banco de dados...');
     await dbConnect();

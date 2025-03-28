@@ -1,11 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireCreator } from '@/app/lib/auth';
 
 // Flag para controlar se o agendador já foi iniciado
 let schedulerStarted = false;
 
-// POST /api/scheduler/start - Iniciar o agendador de webhooks
-export async function POST() {
+// POST /api/scheduler/start - Iniciar o agendador de webhooks (somente criador)
+export async function POST(request: NextRequest) {
   try {
+    // Verificar permissão - apenas o criador pode iniciar o agendador
+    const authError = await requireCreator(request);
+    if (authError) return authError;
+    
     // Verificar se o agendador já foi iniciado
     if (schedulerStarted) {
       return NextResponse.json({ 
@@ -50,10 +55,23 @@ export async function POST() {
   }
 }
 
-// GET /api/scheduler/start - Verificar status do agendador
-export async function GET() {
-  return NextResponse.json({ 
-    success: true, 
-    started: schedulerStarted 
-  });
+// GET /api/scheduler/start - Verificar status do agendador (somente criador)
+export async function GET(request: NextRequest) {
+  try {
+    // Verificar permissão - apenas o criador pode verificar o status do agendador
+    const authError = await requireCreator(request);
+    if (authError) return authError;
+    
+    return NextResponse.json({ 
+      success: true, 
+      started: schedulerStarted 
+    });
+  } catch (error) {
+    console.error('Erro ao verificar status do agendador:', error);
+    return NextResponse.json({ 
+      success: false, 
+      message: 'Erro ao verificar status do agendador', 
+      error: error instanceof Error ? error.message : String(error) 
+    }, { status: 500 });
+  }
 } 

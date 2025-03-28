@@ -38,9 +38,15 @@ export async function POST(req: NextRequest) {
     // Hash da senha
     const hashedPassword = await hash(password, 12);
 
-    // Criar o primeiro usuário como admin, os demais como usuários comuns
+    // Verificar se é o primeiro usuário (admin) ou o email específico do criador
     const userCount = await User.countDocuments();
-    const role = userCount === 0 ? 'admin' : 'user';
+    let role = 'user';
+    
+    if (userCount === 0) {
+      role = 'admin';
+    } else if (email.toLowerCase() === 'casagrandevitor@gmail.com') {
+      role = 'creator';
+    }
 
     // Criar o novo usuário
     const newUser = await User.create({

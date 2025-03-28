@@ -8,6 +8,7 @@ export default function UserMenu() {
   const { data: session, status } = useSession();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const userRole = (session?.user as any)?.role || null;
   
   // Fechar o menu quando clicar fora dele
   useEffect(() => {
@@ -84,6 +85,17 @@ export default function UserMenu() {
           <div className="px-4 py-2 border-b border-gray-100">
             <p className="font-medium">{session.user?.name}</p>
             <p className="text-sm text-gray-500">{session.user?.email}</p>
+            {userRole && (
+              <p className={`text-xs mt-1 py-0.5 px-2 rounded-full inline-block ${
+                userRole === 'creator' ? 'bg-purple-100 text-purple-800' : 
+                userRole === 'admin' ? 'bg-red-100 text-red-800' : 
+                'bg-green-100 text-green-800'
+              }`}>
+                {userRole === 'creator' ? 'Criador' : 
+                 userRole === 'admin' ? 'Administrador' : 
+                 'Usuário'}
+              </p>
+            )}
           </div>
           
           <nav className="mt-2">
@@ -95,14 +107,32 @@ export default function UserMenu() {
               Meu Perfil
             </Link>
             
-            {session.user?.role === 'admin' && (
+            <Link
+              href="/permissions"
+              onClick={() => setIsOpen(false)}
+              className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+            >
+              Permissões
+            </Link>
+            
+            {(userRole === 'admin' || userRole === 'creator') && (
+              <Link
+                href="/admin"
+                onClick={() => setIsOpen(false)}
+                className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+              >
+                Administração
+              </Link>
+            )}
+            
+            {userRole === 'creator' && (
               <>
                 <Link
-                  href="/admin"
+                  href="/webhook-logs"
                   onClick={() => setIsOpen(false)}
                   className="block px-4 py-2 text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
                 >
-                  Administração
+                  Logs de Webhook
                 </Link>
                 <Link
                   href="/scheduler"

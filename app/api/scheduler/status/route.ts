@@ -1,8 +1,13 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireCreator } from '@/app/lib/auth';
 
-// GET /api/scheduler/status - Verificar status do agendador e listar tarefas
-export async function GET() {
+// GET /api/scheduler/status - Verificar status do agendador e listar tarefas (somente criador)
+export async function GET(request: NextRequest) {
   try {
+    // Verificar permissão - apenas o criador pode acessar informações do agendador
+    const authError = await requireCreator(request);
+    if (authError) return authError;
+    
     // Verificar se estamos em ambiente Node.js e não Edge
     if (typeof process === 'undefined' || process.env.NEXT_RUNTIME === 'edge') {
       return NextResponse.json({ 

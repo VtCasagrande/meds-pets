@@ -3,6 +3,7 @@ import dbConnect from '@/app/lib/db';
 import Reminder from '@/app/lib/models/Reminder';
 import { WebhookPayload } from '@/app/lib/types';
 import { Types } from 'mongoose';
+import { getCurrentUserId, getCurrentUserRole, requireAuth } from '@/app/lib/auth';
 
 // Importar funções do schedulerService apenas em ambiente Node.js
 let scheduleReminderNotifications: (reminder: any, webhookUrl?: string, webhookSecret?: string) => Promise<void> = 
@@ -121,23 +122,53 @@ async function sendWebhook(payload: WebhookPayload, webhookUrl?: string, webhook
   }
 }
 
-// GET /api/reminders - Listar todos os lembretes
-export async function GET() {
+// GET /api/reminders - Listar todos os lembretes (com restrições baseadas em função)
+export async function GET(request: NextRequest) {
   console.log('GET /api/reminders - Iniciando busca de lembretes');
   
   try {
+    // Verificar autenticação
+    const authError = await requireAuth(request);
+    if (authError) return authError;
+    
     // Conectar ao MongoDB
     console.log('Conectando ao banco de dados...');
     await dbConnect();
     console.log('Conexão estabelecida com sucesso');
     
+    // Verificar papel do usuário atual
+    const userId = await getCurrentUserId();
+    const userRole = await getCurrentUserRole();
+    
+    // Definir filtros com base no papel do usuário
+    let activeFilter = { isActive: true };
+    let completedFilter = { isActive: false };
+    
+    // Usuários comuns só veem seus próprios lembretes
+    if (userRole === 'user' && userId) {
+      const userEmail = request.headers.get('x-user-email') || '';
+      console.log(`Usuário comum (${userEmail}) - filtrando apenas seus lembretes`);
+      
+      activeFilter = { 
+        ...activeFilter, 
+        createdBy: userId 
+      };
+      
+      completedFilter = { 
+        ...completedFilter, 
+        createdBy: userId 
+      };
+    } else {
+      console.log(`Usuário com permissão (${userRole}) - mostrando todos os lembretes`);
+    }
+    
     // Buscar lembretes ativos e não ativos
     console.log('Buscando lembretes ativos...');
-    const activeReminders = await Reminder.find({ isActive: true }).sort({ createdAt: -1 });
+    const activeReminders = await Reminder.find(activeFilter).sort({ createdAt: -1 });
     console.log(`Encontrados ${activeReminders.length} lembretes ativos`);
     
     console.log('Buscando lembretes finalizados...');
-    const completedReminders = await Reminder.find({ isActive: false }).sort({ createdAt: -1 });
+    const completedReminders = await Reminder.find(completedFilter).sort({ createdAt: -1 });
     console.log(`Encontrados ${completedReminders.length} lembretes finalizados`);
     
     return NextResponse.json({
@@ -163,8 +194,15 @@ export async function POST(request: NextRequest) {
   console.log('POST /api/reminders - Iniciando criação de lembrete');
   
   try {
+    // Verificar autenticação
+    const authError = await requireAuth(request);
+    if (authError) return authError;
+    
     const body = await request.json();
     console.log('Dados recebidos:', JSON.stringify(body, null, 2));
+    
+    // Obter ID do usuário atual para armazenar como criador
+    const userId = await getCurrentUserId();
     
     // Extrair a URL e chave secreta do webhook, se fornecidas
     // Ou usar as configurações de ambiente como fallback
@@ -208,6 +246,11 @@ export async function POST(request: NextRequest) {
       const reminderData = { ...body };
       delete reminderData.webhookUrl;
       delete reminderData.webhookSecret;
+      
+      // Adicionar o ID do usuário como criador do lembrete
+      if (userId) {
+        reminderData.createdBy = userId;
+      }
       
       const reminder = new Reminder(reminderData);
       await reminder.save();

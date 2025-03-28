@@ -1,11 +1,16 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import * as scheduler from '@/app/lib/services/schedulerService';
 import { Types } from 'mongoose';
+import { requireCreator } from '@/app/lib/auth';
 
-// POST /api/scheduler/resync - Recarregar e reagendar todos os lembretes ativos
-export async function POST() {
+// POST /api/scheduler/resync - Recarregar e reagendar todos os lembretes ativos (somente criador)
+export async function POST(request: NextRequest) {
   try {
+    // Verificar permissão - apenas o criador pode acessar a ressincronização
+    const authError = await requireCreator(request);
+    if (authError) return authError;
+    
     // Verificar se estamos em ambiente Node.js e não Edge
     if (typeof process === 'undefined' || process.env.NEXT_RUNTIME === 'edge') {
       return NextResponse.json({ 

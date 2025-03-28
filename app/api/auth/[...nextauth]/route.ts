@@ -53,7 +53,7 @@ const handler = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as 'admin' | 'user';
+        session.user.role = token.role as 'creator' | 'admin' | 'user';
       }
       return session;
     }
