@@ -172,18 +172,76 @@ export default function WebhookLogsPage() {
     }
   };
 
+  // Função para simular uma notificação de webhook
+  const simulateNotification = async () => {
+    setIsCreatingTestLog(true);
+    setTestLogResult(null);
+    
+    try {
+      // Primeiro buscamos um lembrete ativo para usar como base
+      const reminderResponse = await fetch('/api/reminders?active=true');
+      
+      if (!reminderResponse.ok) {
+        throw new Error(`Erro ao buscar lembretes ativos: ${reminderResponse.status}`);
+      }
+      
+      const remindersData = await reminderResponse.json();
+      
+      if (!remindersData.activeReminders || remindersData.activeReminders.length === 0) {
+        throw new Error('Nenhum lembrete ativo encontrado para simular notificação');
+      }
+      
+      const reminder = remindersData.activeReminders[0];
+      const reminderId = reminder._id;
+      
+      // Agora enviamos uma solicitação para simular uma notificação
+      const simulateResponse = await fetch(`/api/reminders/${reminderId}/simulate-notification`, {
+        method: 'POST',
+      });
+      
+      if (!simulateResponse.ok) {
+        throw new Error(`Erro ao simular notificação: ${simulateResponse.status}`);
+      }
+      
+      const data = await simulateResponse.json();
+      setTestLogResult({
+        success: true,
+        message: 'Notificação simulada com sucesso! Verifique os logs.'
+      });
+      
+      // Atualizar a lista de logs
+      fetchLogs();
+    } catch (err) {
+      console.error('Erro ao simular notificação:', err);
+      setTestLogResult({
+        success: false,
+        message: err instanceof Error ? err.message : 'Erro desconhecido'
+      });
+    } finally {
+      setIsCreatingTestLog(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Logs de Webhook</h1>
       
       <div className="flex justify-between items-center mb-4">
-        <div>
+        <div className="flex gap-3">
           <button
             onClick={createTestLog}
             disabled={isCreatingTestLog}
             className="bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 mb-2"
           >
             {isCreatingTestLog ? 'Criando...' : 'Criar Log de Teste'}
+          </button>
+          
+          <button
+            onClick={simulateNotification}
+            disabled={isCreatingTestLog}
+            className="bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700 mb-2"
+          >
+            {isCreatingTestLog ? 'Simulando...' : 'Simular Notificação'}
           </button>
           
           {testLogResult && (

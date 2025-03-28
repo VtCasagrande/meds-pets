@@ -164,6 +164,11 @@ async function checkScheduledTasks() {
   if (tasksToRun.length > 0) {
     console.log(`Encontradas ${tasksToRun.length} tarefas para executar.`);
     
+    // Listar detalhes das tarefas a serem executadas
+    tasksToRun.forEach((task, index) => {
+      console.log(`  ${index + 1}. Tarefa ${task.id} - Agendada para: ${task.scheduledTime.toISOString()}`);
+    });
+    
     // Remover tarefas que serão executadas da lista
     scheduledTasks = scheduledTasks.filter(task => 
       !tasksToRun.some(t => t.id === task.id)
@@ -185,9 +190,27 @@ async function checkScheduledTasks() {
       console.log(`Próximas ${Math.min(3, sortedTasks.length)} tarefas agendadas:`);
       sortedTasks.slice(0, 3).forEach(task => {
         const timeUntil = Math.round((task.scheduledTime.getTime() - now.getTime()) / 1000);
-        console.log(`- Tarefa ${task.id} para lembrete ${task.reminderId} em ${timeUntil} segundos (${task.scheduledTime.toISOString()})`);
+        const timeUntilFormatted = formatTimeInterval(timeUntil);
+        console.log(`- Tarefa ${task.id} para lembrete ${task.reminderId} em ${timeUntil} segundos (${timeUntilFormatted}) - Programada para ${task.scheduledTime.toISOString()}`);
       });
     }
+  }
+}
+
+// Função auxiliar para formatar intervalo de tempo
+function formatTimeInterval(seconds: number): string {
+  if (seconds < 60) {
+    return `${seconds} segundos`;
+  } else if (seconds < 3600) {
+    return `${Math.floor(seconds / 60)} minutos e ${seconds % 60} segundos`;
+  } else if (seconds < 86400) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours} horas e ${minutes} minutos`;
+  } else {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    return `${days} dias e ${hours} horas`;
   }
 }
 
@@ -480,11 +503,18 @@ function scheduleNextNotification(
   
   // Se não tiver data de início ou estiver inativo, não agendar
   if (!product.startDateTime || !reminder.isActive) {
+    console.log(`Não é possível agendar para o produto ${product.title}: data de início não definida ou lembrete inativo`);
     return;
   }
   
   const startDate = new Date(product.startDateTime);
   const now = new Date();
+  
+  // Informações detalhadas para depuração
+  console.log(`Agendando próxima notificação para ${product.title}`);
+  console.log(`Data atual: ${now.toISOString()}`);
+  console.log(`Data de início: ${startDate.toISOString()}`);
+  console.log(`Frequência: ${product.frequencyValue} ${product.frequencyUnit}`);
   
   // Se a data de início for no futuro, agendar para essa data
   // Se for no passado, calcular a próxima data de acordo com a frequência
@@ -493,6 +523,7 @@ function scheduleNextNotification(
   if (startDate > now) {
     // Data futura, simplesmente agendar para essa data
     nextNotificationTime = new Date(startDate);
+    console.log(`Data de início no futuro, agendando para ${nextNotificationTime.toISOString()}`);
   } else {
     // Data no passado, calcular próxima ocorrência
     const frequencyValue = product.frequencyValue || 8;
@@ -507,46 +538,66 @@ function scheduleNextNotification(
     switch (frequencyUnit) {
       case 'minutos':
         intervalMs = frequencyValue * 60 * 1000;
+        console.log(`Frequência configurada para ${frequencyValue} minutos (${intervalMs}ms)`);
         break;
       case 'horas':
         intervalMs = frequencyValue * 60 * 60 * 1000;
+        console.log(`Frequência configurada para ${frequencyValue} horas (${intervalMs}ms)`);
         break;
       case 'dias':
         intervalMs = frequencyValue * 24 * 60 * 60 * 1000;
+        console.log(`Frequência configurada para ${frequencyValue} dias (${intervalMs}ms)`);
         break;
     }
     
-    // Para intervalos muito curtos (menos de 1 minuto), forçar intervalo mínimo
+    // Para intervalos muito curtos (menos de 30 segundos), usar intervalo mínimo
     if (intervalMs < 30000) {
       console.log(`Intervalo de ${intervalMs}ms é muito curto, usando intervalo mínimo de 30 segundos`);
       intervalMs = 30000;
     }
     
-    // Calcular quantos intervalos se passaram desde o início
-    const timeSinceStart = now.getTime() - startDate.getTime();
-    const intervals = Math.floor(timeSinceStart / intervalMs);
+    // Novo método para cálculo da próxima ocorrência
+    // Baseado no tempo decorrido desde o início
+    const timeSinceStart = Math.max(0, now.getTime() - startDate.getTime());
     
-    // Calcular quando será a próxima ocorrência
-    const calculatedTime = startDate.getTime() + (intervals + 1) * intervalMs;
+    // Calcular quantos intervalos completos se passaram desde o início
+    const intervalsElapsed = Math.floor(timeSinceStart / intervalMs);
     
-    // Garantir que a próxima notificação seja no futuro (pelo menos 5 segundos no futuro)
-    if (calculatedTime <= now.getTime() + 5000) {
-      // Se a próxima notificação calculada for no passado ou muito próxima, agendar para o próximo intervalo
+    // A próxima ocorrência é o início + (n+1) intervalos
+    const nextOccurrenceTime = startDate.getTime() + ((intervalsElapsed + 1) * intervalMs);
+    
+    console.log(`Tempo desde o início: ${timeSinceStart}ms (${timeSinceStart / 1000} segundos)`);
+    console.log(`Intervalos completos decorridos: ${intervalsElapsed}`);
+    console.log(`Próximo horário calculado: ${new Date(nextOccurrenceTime).toISOString()}`);
+    
+    // Verificar se a próxima ocorrência já passou (pode acontecer devido a atrasos)
+    if (nextOccurrenceTime <= now.getTime()) {
+      // Se já passou, agendar para daqui a um intervalo completo
       nextNotificationTime = new Date(now.getTime() + intervalMs);
-      console.log(`Próxima notificação calculada estava no passado ou muito próxima, agendada para ${intervalMs}ms a partir de agora`);
+      console.log(`Próxima ocorrência já passou, agendando para um intervalo a partir de agora: ${nextNotificationTime.toISOString()}`);
     } else {
-      nextNotificationTime = new Date(calculatedTime);
+      // Caso contrário, usar o valor calculado
+      nextNotificationTime = new Date(nextOccurrenceTime);
+      console.log(`Próxima ocorrência no futuro, agendando para: ${nextNotificationTime.toISOString()}`);
     }
   }
   
   // Verificar se a data final já passou
   if (product.endDateTime) {
     const endDate = new Date(product.endDateTime);
+    console.log(`Data de término: ${endDate.toISOString()}`);
+    
     if (nextNotificationTime > endDate) {
       console.log(`Tratamento já finalizado para medicamento ${product.title}. Ignorando agendamento.`);
       return;
     }
   }
+  
+  // Tempo até a próxima notificação, em milissegundos/segundos
+  const timeUntilNextMs = nextNotificationTime.getTime() - now.getTime();
+  const timeUntilNextSec = Math.round(timeUntilNextMs / 1000);
+  
+  console.log(`Próxima notificação em ${timeUntilNextSec} segundos (${timeUntilNextMs}ms)`);
   
   // Gerar ID único para a tarefa
   const taskId = `${reminder.id || reminder._id}_${medicationIndex}_${Date.now()}`;
@@ -561,7 +612,7 @@ function scheduleNextNotification(
     webhookSecret
   });
   
-  console.log(`Notificação agendada para ${nextNotificationTime.toISOString()} para medicamento ${product.title}`);
+  console.log(`Tarefa ${taskId} agendada para ${nextNotificationTime.toISOString()} (medicamento ${product.title})`);
 }
 
 // Remover todas as notificações agendadas para um lembrete
