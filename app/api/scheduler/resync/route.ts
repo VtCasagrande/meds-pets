@@ -72,7 +72,7 @@ export async function POST() {
           const durationUnit = (product.durationUnit as 'dias' | 'semanas' | 'meses') || 'dias';
           
           return {
-            id: product._id ? product._id.toString() : undefined,
+            id: product.id || `med-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             title: product.title || '',
             quantity: product.quantity || '',
             frequency: product.frequency || '',
