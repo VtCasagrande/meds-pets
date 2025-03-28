@@ -15,6 +15,8 @@ export default function WebhooksList({ medications, reminderId }: WebhooksListPr
   const [success, setSuccess] = useState<number | null>(null);
   const [webhookUrl, setWebhookUrl] = useState<string>('');
   const [webhookSecret, setWebhookSecret] = useState<string>('');
+  const [isForcingNotification, setIsForcingNotification] = useState<boolean>(false);
+  const [forceResult, setForceResult] = useState<{ success: boolean; message: string } | null>(null);
 
   useEffect(() => {
     // Carregar configurações de webhook do localStorage
@@ -65,9 +67,50 @@ export default function WebhooksList({ medications, reminderId }: WebhooksListPr
     }
   };
 
+  const forceNotification = async () => {
+    setIsForcingNotification(true);
+    setForceResult(null);
+    setError(null);
+    
+    try {
+      const response = await fetch(`/api/reminders/${reminderId}/force-notification`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao forçar notificação');
+      }
+      
+      const data = await response.json();
+      setForceResult({
+        success: true,
+        message: `Notificação enviada com sucesso! Próxima agendada para ${new Date(data.nextNotification).toLocaleString()}`
+      });
+    } catch (err) {
+      console.error('Erro ao forçar notificação:', err);
+      setForceResult({
+        success: false,
+        message: `Erro ao forçar notificação: ${err instanceof Error ? err.message : 'Erro desconhecido'}`
+      });
+    } finally {
+      setIsForcingNotification(false);
+    }
+  };
+
   return (
     <div className="mt-6">
-      <h4 className="text-lg font-semibold mb-3">Disparar Notificações (Webhooks)</h4>
+      <div className="flex justify-between items-center mb-3">
+        <h4 className="text-lg font-semibold">Disparar Notificações (Webhooks)</h4>
+        
+        <button
+          onClick={forceNotification}
+          disabled={isForcingNotification}
+          className="px-3 py-1 bg-purple-500 text-white text-sm rounded-md hover:bg-purple-600 disabled:opacity-50"
+        >
+          {isForcingNotification ? 'Processando...' : 'Forçar Agendamento'}
+        </button>
+      </div>
       
       {!webhookUrl && (
         <div className="bg-yellow-100 text-yellow-800 p-3 rounded-md mb-4">
@@ -97,6 +140,12 @@ export default function WebhooksList({ medications, reminderId }: WebhooksListPr
       {success !== null && (
         <div className="bg-green-100 text-green-700 p-3 rounded-md mb-4">
           Notificação enviada com sucesso para {medications[success]?.title || 'o medicamento'}!
+        </div>
+      )}
+      
+      {forceResult && (
+        <div className={`p-3 rounded-md mb-4 ${forceResult.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+          {forceResult.message}
         </div>
       )}
       

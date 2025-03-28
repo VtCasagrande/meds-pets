@@ -234,6 +234,8 @@ async function executeTask(task: ScheduledTask) {
     }
     
     const medicationProduct = reminder.medicationProducts[task.medicationIndex];
+    console.log(`Executando tarefa para medicamento: ${medicationProduct.title}`);
+    console.log(`Detalhes da frequência: ${medicationProduct.frequencyValue} ${medicationProduct.frequencyUnit}`);
     
     // Preparar payload do webhook
     const webhookPayload: WebhookPayload = {
@@ -261,8 +263,64 @@ async function executeTask(task: ScheduledTask) {
     
     console.log(`Tarefa ${task.id} executada com sucesso.`);
     
-    // Agendar próxima notificação se necessário
-    scheduleNextNotification(reminder, task.medicationIndex, task.webhookUrl, task.webhookSecret);
+    // Agendar próxima notificação
+    // Para frequências em minutos, agendar imediatamente a próxima
+    const now = new Date();
+    
+    // Determinar o intervalo em milissegundos
+    let intervalMs = 0;
+    const frequencyValue = medicationProduct.frequencyValue || 8;
+    const frequencyUnit = medicationProduct.frequencyUnit || 'horas';
+    
+    // Calcular intervalo em milissegundos
+    switch (frequencyUnit) {
+      case 'minutos':
+        intervalMs = frequencyValue * 60 * 1000;
+        console.log(`Frequência em minutos: ${frequencyValue} (${intervalMs}ms)`);
+        break;
+      case 'horas':
+        intervalMs = frequencyValue * 60 * 60 * 1000;
+        console.log(`Frequência em horas: ${frequencyValue} (${intervalMs}ms)`);
+        break;
+      case 'dias':
+        intervalMs = frequencyValue * 24 * 60 * 60 * 1000;
+        console.log(`Frequência em dias: ${frequencyValue} (${intervalMs}ms)`);
+        break;
+    }
+    
+    // Data para a próxima notificação (agora + intervalo)
+    const nextNotificationTime = new Date(now.getTime() + intervalMs);
+    
+    // Verificar se a data final já passou
+    let shouldScheduleNext = true;
+    
+    if (medicationProduct.endDateTime) {
+      const endDate = new Date(medicationProduct.endDateTime);
+      console.log(`Data de término: ${endDate.toISOString()}`);
+      
+      if (nextNotificationTime > endDate) {
+        console.log(`Tratamento finalizado para medicamento ${medicationProduct.title}. Não agendando próxima notificação.`);
+        shouldScheduleNext = false;
+      }
+    }
+    
+    if (shouldScheduleNext) {
+      // Gerar ID único para a tarefa
+      const taskId = `${reminder.id || reminder._id}_${task.medicationIndex}_${Date.now()}`;
+      
+      // Adicionar à lista de tarefas agendadas
+      scheduledTasks.push({
+        id: taskId,
+        reminderId: reminder.id || reminder._id || '',
+        medicationIndex: task.medicationIndex,
+        scheduledTime: nextNotificationTime,
+        webhookUrl: task.webhookUrl,
+        webhookSecret: task.webhookSecret
+      });
+      
+      console.log(`Próxima notificação agendada para ${nextNotificationTime.toISOString()} (medicamento ${medicationProduct.title})`);
+      console.log(`Tempo até a próxima notificação: ${Math.round(intervalMs/1000)} segundos`);
+    }
     
     // Verificar se todos os tratamentos foram concluídos
     await checkReminderCompletion(reminder, task.webhookUrl, task.webhookSecret);

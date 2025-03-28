@@ -17,6 +17,8 @@ export default function ReminderDetailsPage({ params }: { params: { id: string }
   const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isTogglingStatus, setIsTogglingStatus] = useState(false);
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
+  const [notificationResult, setNotificationResult] = useState<string | null>(null);
 
   useEffect(() => {
     fetchReminderDetails();
@@ -114,6 +116,42 @@ export default function ReminderDetailsPage({ params }: { params: { id: string }
     router.push(`/reminders/${id}/edit`);
   };
 
+  const handleForceNotification = async () => {
+    if (!reminder || !reminder.isActive) return;
+    
+    try {
+      setIsSendingNotification(true);
+      setNotificationResult(null);
+      
+      const response = await fetch(`/api/reminders/${id}/force-notification`, {
+        method: 'POST'
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao enviar notificação');
+      }
+      
+      const data = await response.json();
+      setNotificationResult('Notificação enviada com sucesso!');
+      
+      // Atualizar os detalhes do lembrete para mostrar as mudanças
+      setTimeout(() => {
+        fetchReminderDetails();
+      }, 1000);
+    } catch (error) {
+      console.error('Erro ao enviar notificação:', error);
+      setNotificationResult('Erro ao enviar notificação. Tente novamente.');
+    } finally {
+      setIsSendingNotification(false);
+      
+      // Limpar a mensagem após alguns segundos
+      setTimeout(() => {
+        setNotificationResult(null);
+      }, 5000);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="text-center p-8">
@@ -159,6 +197,16 @@ export default function ReminderDetailsPage({ params }: { params: { id: string }
         <div className="flex justify-between items-center mt-2">
           <h2 className="text-2xl font-bold">Detalhes do Lembrete</h2>
           <div className="flex items-center space-x-3">
+            {reminder.isActive && (
+              <button
+                onClick={handleForceNotification}
+                disabled={isSendingNotification}
+                className="py-2 px-4 rounded-lg shadow-md text-white text-sm font-semibold bg-purple-500 hover:bg-purple-600 disabled:opacity-50"
+              >
+                {isSendingNotification ? 'Enviando...' : 'Enviar Notificação'}
+              </button>
+            )}
+            
             <button
               onClick={handleEdit}
               className="py-2 px-4 rounded-lg shadow-md text-white text-sm font-semibold bg-blue-500 hover:bg-blue-600"
@@ -228,6 +276,12 @@ export default function ReminderDetailsPage({ params }: { params: { id: string }
           <h4 className="text-lg font-semibold mb-3">Medicamentos</h4>
           <MedicationProductList products={reminder.medicationProducts} />
         </div>
+        
+        {notificationResult && (
+          <div className={`mt-4 p-3 rounded ${notificationResult.includes('Erro') ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+            {notificationResult}
+          </div>
+        )}
         
         {reminder.isActive && (
           <WebhooksList 
