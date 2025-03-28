@@ -247,12 +247,37 @@ export async function POST(
       // Importar função de agendamento sem ter que reformular a lógica
       const { scheduleReminderNotifications } = await import('@/app/lib/services/schedulerService');
       
-      // Reagendar com as novas configurações
-      await scheduleReminderNotifications({
-        ...reminder.toObject(),
+      // Converter o documento do MongoDB para o formato esperado pelo tipo Reminder
+      const reminderObj = reminder.toObject();
+      
+      // Garantir que todos os campos necessários estão presentes e com valores válidos
+      const reminderForScheduling = {
         id: reminder._id.toString(),
-        _id: reminder._id.toString()
-      }, webhookUrl, webhookSecret);
+        _id: reminder._id.toString(),
+        tutorName: reminderObj.tutorName,
+        petName: reminderObj.petName,
+        petBreed: reminderObj.petBreed || '',
+        phoneNumber: reminderObj.phoneNumber,
+        isActive: reminderObj.isActive,
+        createdAt: reminderObj.createdAt?.toISOString() || new Date().toISOString(),
+        updatedAt: reminderObj.updatedAt?.toISOString() || new Date().toISOString(),
+        // Converter cada medicationProduct para garantir que todos os campos obrigatórios estão presentes
+        medicationProducts: reminderObj.medicationProducts.map(product => ({
+          id: product._id?.toString(),
+          title: product.title,
+          quantity: product.quantity,
+          frequency: product.frequency,
+          frequencyValue: product.frequencyValue || 8, // Valor padrão se indefinido
+          frequencyUnit: (product.frequencyUnit as 'minutos' | 'horas' | 'dias') || 'horas',
+          duration: product.duration || 7, // Valor padrão se indefinido
+          durationUnit: (product.durationUnit as 'dias' | 'semanas' | 'meses') || 'dias',
+          startDateTime: product.startDateTime?.toISOString() || new Date().toISOString(),
+          endDateTime: product.endDateTime?.toISOString()
+        }))
+      };
+      
+      // Reagendar com as novas configurações
+      await scheduleReminderNotifications(reminderForScheduling, webhookUrl, webhookSecret);
       
       console.log(`Próxima notificação agendada para ${nextNotificationTime.toISOString()}`);
     }
