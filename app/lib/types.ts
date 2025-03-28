@@ -51,9 +51,9 @@ export type WebhookPayload = {
     title: string;
     quantity: string;
     frequencyValue: number;
-    frequencyUnit: string;
+    frequencyUnit: 'minutos' | 'horas' | 'dias';
     duration: number;
-    durationUnit: string;
+    durationUnit: 'dias' | 'semanas' | 'meses';
     startDateTime: string;
     endDateTime?: string;
   }

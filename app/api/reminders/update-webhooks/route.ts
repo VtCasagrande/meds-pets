@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
 import Reminder from '@/app/lib/models/Reminder';
-import { Reminder as ReminderType } from '@/app/lib/types';
+import { Reminder as ReminderType, MedicationProduct } from '@/app/lib/types';
 import { Types } from 'mongoose';
 
 interface UpdateWebhooksRequest {
@@ -31,6 +31,22 @@ interface ReminderDocument {
     startDateTime: Date;
     endDateTime?: Date;
   }>;
+}
+
+// Função para validar e converter o frequencyUnit para um dos valores aceitos
+function validateFrequencyUnit(value?: string): 'minutos' | 'horas' | 'dias' {
+  if (value === 'minutos' || value === 'horas' || value === 'dias') {
+    return value;
+  }
+  return 'horas'; // valor padrão
+}
+
+// Função para validar e converter o durationUnit para um dos valores aceitos
+function validateDurationUnit(value?: string): 'dias' | 'semanas' | 'meses' {
+  if (value === 'dias' || value === 'semanas' || value === 'meses') {
+    return value;
+  }
+  return 'dias'; // valor padrão
 }
 
 export async function POST(request: NextRequest) {
@@ -84,6 +100,19 @@ export async function POST(request: NextRequest) {
       
       // Reagendar notificações para cada lembrete
       for (const reminder of reminders) {
+        const medicationProducts: MedicationProduct[] = reminder.medicationProducts.map(product => ({
+          id: product.id?.toString(),
+          title: product.title,
+          quantity: product.quantity,
+          frequency: product.frequency,
+          frequencyValue: product.frequencyValue || 0,
+          frequencyUnit: validateFrequencyUnit(product.frequencyUnit),
+          duration: product.duration || 0,
+          durationUnit: validateDurationUnit(product.durationUnit),
+          startDateTime: product.startDateTime.toISOString(),
+          endDateTime: product.endDateTime ? product.endDateTime.toISOString() : undefined
+        }));
+
         await schedulerService.scheduleReminderNotifications(
           {
             id: reminder._id.toString(),
@@ -95,18 +124,7 @@ export async function POST(request: NextRequest) {
             isActive: reminder.isActive,
             webhookUrl: reminder.webhookUrl,
             webhookSecret: reminder.webhookSecret,
-            medicationProducts: reminder.medicationProducts.map(product => ({
-              id: product.id?.toString(),
-              title: product.title,
-              quantity: product.quantity,
-              frequency: product.frequency,
-              frequencyValue: product.frequencyValue || 0,
-              frequencyUnit: product.frequencyUnit || 'horas',
-              duration: product.duration || 0,
-              durationUnit: product.durationUnit || 'dias',
-              startDateTime: product.startDateTime.toISOString(),
-              endDateTime: product.endDateTime ? product.endDateTime.toISOString() : undefined
-            }))
+            medicationProducts
           },
           body.webhookUrl,
           body.webhookSecret

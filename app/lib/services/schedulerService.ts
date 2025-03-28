@@ -35,6 +35,22 @@ function formatDateSafe(date: any): string {
   return '';
 }
 
+// Função para validar e converter o frequencyUnit para um dos valores aceitos
+function validateFrequencyUnit(value?: string): 'minutos' | 'horas' | 'dias' {
+  if (value === 'minutos' || value === 'horas' || value === 'dias') {
+    return value;
+  }
+  return 'horas'; // valor padrão
+}
+
+// Função para validar e converter o durationUnit para um dos valores aceitos
+function validateDurationUnit(value?: string): 'dias' | 'semanas' | 'meses' {
+  if (value === 'dias' || value === 'semanas' || value === 'meses') {
+    return value;
+  }
+  return 'dias'; // valor padrão
+}
+
 // Verificar lembretes finalizados diariamente
 async function checkAllCompletedReminders() {
   if (!isNodeEnvironment) {
@@ -243,6 +259,10 @@ async function executeTask(task: ScheduledTask) {
     
     console.log(`Configurações de webhook - URL: ${webhookUrl || 'não configurada'}, Secret: ${webhookSecret ? 'configurado' : 'não configurado'}`);
     
+    // Validar tipos de frequencyUnit e durationUnit
+    const validFrequencyUnit = validateFrequencyUnit(medicationProduct.frequencyUnit);
+    const validDurationUnit = validateDurationUnit(medicationProduct.durationUnit);
+    
     // Preparar payload do webhook
     const webhookPayload: WebhookPayload = {
       reminderId: reminder.id || reminder._id || task.reminderId,
@@ -256,9 +276,9 @@ async function executeTask(task: ScheduledTask) {
         title: medicationProduct.title,
         quantity: medicationProduct.quantity,
         frequencyValue: medicationProduct.frequencyValue || 0,
-        frequencyUnit: medicationProduct.frequencyUnit || 'horas',
+        frequencyUnit: validFrequencyUnit,
         duration: medicationProduct.duration || 0,
-        durationUnit: medicationProduct.durationUnit || 'dias',
+        durationUnit: validDurationUnit,
         startDateTime: formatDateSafe(medicationProduct.startDateTime),
         endDateTime: formatDateSafe(medicationProduct.endDateTime)
       }
@@ -286,7 +306,7 @@ async function executeTask(task: ScheduledTask) {
     // Determinar o intervalo em milissegundos
     let intervalMs = 0;
     const frequencyValue = medicationProduct.frequencyValue || 8;
-    const frequencyUnit = medicationProduct.frequencyUnit || 'horas';
+    const frequencyUnit = validateFrequencyUnit(medicationProduct.frequencyUnit);
     
     // Calcular intervalo em milissegundos
     switch (frequencyUnit) {
@@ -557,18 +577,12 @@ async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
       petBreed: reminderDoc.petBreed || '',
       phoneNumber: reminderDoc.phoneNumber,
       isActive: reminderDoc.isActive,
+      webhookUrl: reminderDoc.webhookUrl,
+      webhookSecret: reminderDoc.webhookSecret,
       medicationProducts: reminderDoc.medicationProducts.map(product => {
-        // Garantir que frequencyUnit seja um valor válido
-        let frequencyUnit: 'minutos' | 'horas' | 'dias' = 'horas';
-        if (product.frequencyUnit === 'minutos' || product.frequencyUnit === 'horas' || product.frequencyUnit === 'dias') {
-          frequencyUnit = product.frequencyUnit;
-        }
-        
-        // Garantir que durationUnit seja um valor válido
-        let durationUnit: 'dias' | 'semanas' | 'meses' = 'dias';
-        if (product.durationUnit === 'dias' || product.durationUnit === 'semanas' || product.durationUnit === 'meses') {
-          durationUnit = product.durationUnit;
-        }
+        // Validar frequencyUnit e durationUnit
+        const frequencyUnit = validateFrequencyUnit(product.frequencyUnit);
+        const durationUnit = validateDurationUnit(product.durationUnit);
         
         return {
           // O campo id pode não existir no modelo Mongoose
@@ -674,10 +688,7 @@ function scheduleNextNotification(
     // Data no passado, calcular próxima ocorrência
     const frequencyValue = product.frequencyValue || 8;
     // Garantir que frequencyUnit seja um valor válido
-    let frequencyUnit: 'minutos' | 'horas' | 'dias' = 'horas';
-    if (product.frequencyUnit === 'minutos' || product.frequencyUnit === 'horas' || product.frequencyUnit === 'dias') {
-      frequencyUnit = product.frequencyUnit;
-    }
+    const frequencyUnit = validateFrequencyUnit(product.frequencyUnit);
     
     // Calcular intervalo em milissegundos
     let intervalMs = 0;
@@ -842,6 +853,10 @@ async function checkReminderCompletion(reminder: Reminder, webhookUrl?: string, 
       if (webhookUrl) {
         const firstProduct = reminder.medicationProducts[0];
         
+        // Validar tipos para garantir compatibilidade
+        const validFrequencyUnit = validateFrequencyUnit(firstProduct.frequencyUnit);
+        const validDurationUnit = validateDurationUnit(firstProduct.durationUnit);
+        
         const webhookPayload: WebhookPayload = {
           reminderId: reminder.id || reminder._id || '',
           tutorName: reminder.tutorName,
@@ -854,9 +869,9 @@ async function checkReminderCompletion(reminder: Reminder, webhookUrl?: string, 
             title: firstProduct.title,
             quantity: firstProduct.quantity,
             frequencyValue: firstProduct.frequencyValue || 0,
-            frequencyUnit: firstProduct.frequencyUnit || 'horas',
+            frequencyUnit: validFrequencyUnit,
             duration: firstProduct.duration || 0,
-            durationUnit: firstProduct.durationUnit || 'dias',
+            durationUnit: validDurationUnit,
             startDateTime: formatDateSafe(firstProduct.startDateTime),
             endDateTime: formatDateSafe(firstProduct.endDateTime)
           }
