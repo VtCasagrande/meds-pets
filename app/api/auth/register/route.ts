@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { hash } from 'bcryptjs';
 import dbConnect from '@/app/lib/db';
-import User from '@/app/lib/models/User';
+import User, { IUser } from '@/app/lib/models/User';
+import { Document } from 'mongoose';
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
       email,
       password: hashedPassword,
       role
-    });
+    }) as IUser & Document;
 
     // Retornar resposta sem expor a senha
     const user = {

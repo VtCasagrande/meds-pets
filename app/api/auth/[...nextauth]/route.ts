@@ -2,7 +2,8 @@ import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { compare } from 'bcryptjs';
 import dbConnect from '@/app/lib/db';
-import User from '@/app/lib/models/User';
+import User, { IUser } from '@/app/lib/models/User';
+import { Document } from 'mongoose';
 
 const handler = NextAuth({
   providers: [
@@ -20,7 +21,7 @@ const handler = NextAuth({
 
         await dbConnect();
         
-        const user = await User.findOne({ email: credentials.email });
+        const user = await User.findOne({ email: credentials.email }) as IUser & Document;
         
         if (!user) {
           throw new Error('Usuário não encontrado');

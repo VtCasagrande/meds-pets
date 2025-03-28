@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import dbConnect from '@/app/lib/db';
-import User from '@/app/lib/models/User';
+import User, { IUser } from '@/app/lib/models/User';
 import bcrypt from 'bcryptjs';
+import { Document, Types } from 'mongoose';
 
 // Verificar se o usuário é admin
 async function isAdmin() {
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
     
     // Preparar os dados para a resposta
     const formattedUsers = users.map(user => ({
-      id: user._id.toString(),
+      id: (user._id as Types.ObjectId).toString(),
       name: user.name,
       email: user.email,
       role: user.role,

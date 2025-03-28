@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import dbConnect from '@/app/lib/db';
-import User from '@/app/lib/models/User';
+import User, { IUser } from '@/app/lib/models/User';
 import bcrypt from 'bcryptjs';
+import { Document } from 'mongoose';
 
 // Verificar se o usuário é admin
 async function isAdmin() {
@@ -122,7 +123,7 @@ export async function PUT(
       params.id,
       { $set: updateData },
       { new: true }
-    ).select('-password');
+    ).select('-password') as IUser & Document;
     
     return NextResponse.json({
       message: 'Usuário atualizado com sucesso',
@@ -161,7 +162,7 @@ export async function DELETE(
     await dbConnect();
     
     // Buscar o usuário existente
-    const user = await User.findById(params.id);
+    const user = await User.findById(params.id) as IUser & Document;
     
     if (!user) {
       return NextResponse.json(
