@@ -267,6 +267,15 @@ export default function MedicationProductForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault(); // Impedir o comportamento padrão de submissão do formulário
+    e.stopPropagation(); // Impedir que o evento propague para formulários pai
+    
+    // Validar campos obrigatórios
+    if (!product.title || !product.quantity || !product.frequencyValue || !product.startDateTime) {
+      alert('Por favor, preencha todos os campos obrigatórios');
+      return;
+    }
+    
+    // Enviar para componente pai
     onAdd(product);
   };
 
