@@ -77,7 +77,6 @@ async function dbConnect() {
   // Se ainda não temos uma promessa de conexão, criá-la
   if (!cached.promise) {
     const opts = {
-      bufferCommands: false,
       // Adicionar retry e timeout
       serverSelectionTimeoutMS: 30000, // Aumentado para 30s
       socketTimeoutMS: 60000, // 60s
@@ -103,7 +102,9 @@ async function dbConnect() {
     try {
       console.log('Testando conexão MongoDB com MongoClient...');
       const { MongoClient } = require('mongodb');
-      const client = new MongoClient(MONGODB_URI_VERIFIED, opts);
+      // Criar uma cópia das opções sem bufferCommands, que não é suportado pelo MongoClient
+      const testOpts = { ...opts };
+      const client = new MongoClient(MONGODB_URI_VERIFIED, testOpts);
       await client.connect();
       console.log('Teste de conexão bem-sucedido com MongoClient');
       await client.close();
