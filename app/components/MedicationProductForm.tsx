@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from "react";
-import { MedicationProduct } from "@/app/types/types";
+import { MedicationProduct } from "@/app/lib/types";
 
 interface MedicationProductFormProps {
   onAdd: (product: MedicationProduct) => void;
