@@ -75,13 +75,7 @@ async function checkAllCompletedReminders() {
     const [dbConnect, ReminderModel] = await Promise.all([dbConnectPromise, ReminderModelPromise]);
     
     // Conectar ao banco de dados
-    try {
-      await dbConnect();
-      console.log('Conexão com MongoDB estabelecida para verificação de lembretes');
-    } catch (dbError) {
-      console.error('Erro ao conectar com MongoDB:', dbError);
-      return; // Abortar a verificação se não conseguir conectar
-    }
+    await dbConnect();
     
     // Buscar todos os lembretes ativos
     const activeReminders = await ReminderModel.find({ isActive: true });
@@ -807,19 +801,20 @@ export async function scheduleReminderNotifications(
   }
 }
 
-// Remover todas as notificações agendadas para um lembrete
-export function removeReminderNotifications(reminderId: string) {
+// Remover tarefas agendadas para um lembrete específico
+function removeTasksForReminder(reminderId: string): void {
   if (!isNodeEnvironment) {
-    console.log('Ambiente não suportado para remover notificações');
+    console.log('Ambiente não suportado para remover tarefas');
     return;
   }
 
   const tasksCount = scheduledTasks.length;
   
+  // Filtrar para manter apenas tarefas que não pertencem a este lembrete
   scheduledTasks = scheduledTasks.filter(task => task.reminderId !== reminderId);
   
   const removedCount = tasksCount - scheduledTasks.length;
-  console.log(`Removidas ${removedCount} notificações agendadas para lembrete ${reminderId}`);
+  console.log(`Removidas ${removedCount} tarefas agendadas para o lembrete ${reminderId}`);
 }
 
 // Listar todas as tarefas agendadas (para visualização no painel)
