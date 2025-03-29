@@ -75,7 +75,13 @@ async function checkAllCompletedReminders() {
     const [dbConnect, ReminderModel] = await Promise.all([dbConnectPromise, ReminderModelPromise]);
     
     // Conectar ao banco de dados
-    await dbConnect();
+    try {
+      await dbConnect();
+      console.log('Conexão com MongoDB estabelecida para verificação de lembretes');
+    } catch (dbError) {
+      console.error('Erro ao conectar com MongoDB:', dbError);
+      return; // Abortar a verificação se não conseguir conectar
+    }
     
     // Buscar todos os lembretes ativos
     const activeReminders = await ReminderModel.find({ isActive: true });
@@ -633,166 +639,172 @@ async function fetchReminderById(reminderId: string): Promise<Reminder | null> {
 
 // Agendar notificações para um lembrete
 export async function scheduleReminderNotifications(
-  reminder: Reminder, 
+  reminder: any, 
   webhookUrl?: string, 
   webhookSecret?: string
-) {
+): Promise<void> {
+  // Verificar ambiente Node.js (não Edge)
   if (!isNodeEnvironment) {
-    console.log('Ambiente não suportado para agendamento de notificações');
+    console.log('Agendamento de notificações pulado: ambiente não suportado');
     return;
   }
 
-  if (!reminder.isActive) {
-    console.log(`Lembrete ${reminder.id || reminder._id} não está ativo. Ignorando agendamento.`);
-    return;
-  }
-  
-  // Priorizar as configurações de webhook do próprio lembrete
-  const finalWebhookUrl = reminder.webhookUrl || webhookUrl;
-  const finalWebhookSecret = reminder.webhookSecret || webhookSecret;
-  
-  console.log(`Agendando notificações para lembrete ${reminder.id || reminder._id}`);
-  console.log(`Configurações de webhook - URL: ${finalWebhookUrl || 'não configurada'}, Secret: ${finalWebhookSecret ? 'configurado' : 'não configurado'}`);
-  
-  // Agendar notificações para cada medicamento
-  reminder.medicationProducts.forEach((product, index) => {
-    console.log(`Agendando notificação para medicamento ${index + 1}: ${product.title}`);
-    scheduleNextNotification(reminder, index, finalWebhookUrl, finalWebhookSecret);
-  });
-  
-  console.log(`Notificações agendadas com sucesso para lembrete ${reminder.id || reminder._id}`);
-  
-  // Se não tiver URL de webhook configurada, exibir alerta
-  if (!finalWebhookUrl) {
-    console.warn(`⚠️ ALERTA: Lembrete ${reminder.id || reminder._id} não possui URL de webhook configurada. As notificações serão agendadas, mas nenhum webhook será enviado.`);
-  }
-}
-
-// Agendar próxima notificação para um medicamento
-function scheduleNextNotification(
-  reminder: Reminder,
-  medicationIndex: number,
-  webhookUrl?: string,
-  webhookSecret?: string
-) {
-  const product = reminder.medicationProducts[medicationIndex];
-  
-  // Se não tiver data de início ou estiver inativo, não agendar
-  if (!product.startDateTime || !reminder.isActive) {
-    console.log(`Não é possível agendar para o produto ${product.title}: data de início não definida ou lembrete inativo`);
-    return;
-  }
-  
-  // Priorizar o webhookUrl e webhookSecret do lembrete, se disponíveis
-  const finalWebhookUrl = reminder.webhookUrl || webhookUrl;
-  const finalWebhookSecret = reminder.webhookSecret || webhookSecret;
-  
-  console.log(`Configurações de webhook para agendamento - URL: ${finalWebhookUrl || 'não configurada'}, Secret: ${finalWebhookSecret ? 'configurado' : 'não configurado'}`);
-  
-  const startDate = new Date(product.startDateTime);
-  const now = new Date();
-  
-  // Informações detalhadas para depuração
-  console.log(`Agendando próxima notificação para ${product.title}`);
-  console.log(`Data atual: ${now.toISOString()}`);
-  console.log(`Data de início: ${startDate.toISOString()}`);
-  console.log(`Frequência: ${product.frequencyValue} ${product.frequencyUnit}`);
-  
-  // Se a data de início for no futuro, agendar para essa data
-  // Se for no passado, calcular a próxima data de acordo com a frequência
-  let nextNotificationTime: Date;
-  
-  if (startDate > now) {
-    // Data futura, simplesmente agendar para essa data
-    nextNotificationTime = new Date(startDate);
-    console.log(`Data de início no futuro, agendando para ${nextNotificationTime.toISOString()}`);
-  } else {
-    // Data no passado, calcular próxima ocorrência
-    const frequencyValue = product.frequencyValue || 8;
-    // Garantir que frequencyUnit seja um valor válido
-    const frequencyUnit = validateFrequencyUnit(product.frequencyUnit);
+  try {
+    console.log(`Agendando notificações para o lembrete ${reminder._id || 'novo'}`);
     
-    // Calcular intervalo em milissegundos
-    let intervalMs = 0;
-    switch (frequencyUnit) {
-      case 'minutos':
-        intervalMs = frequencyValue * 60 * 1000;
-        console.log(`Frequência configurada para ${frequencyValue} minutos (${intervalMs}ms)`);
-        break;
-      case 'horas':
-        intervalMs = frequencyValue * 60 * 60 * 1000;
-        console.log(`Frequência configurada para ${frequencyValue} horas (${intervalMs}ms)`);
-        break;
-      case 'dias':
-        intervalMs = frequencyValue * 24 * 60 * 60 * 1000;
-        console.log(`Frequência configurada para ${frequencyValue} dias (${intervalMs}ms)`);
-        break;
+    // Iniciar agendador se não estiver rodando
+    if (!schedulerInterval) {
+      console.log('Agendador não iniciado, iniciando agora...');
+      startScheduler();
     }
     
-    // Para intervalos muito curtos (menos de 30 segundos), usar intervalo mínimo
-    if (intervalMs < 30000) {
-      console.log(`Intervalo de ${intervalMs}ms é muito curto, usando intervalo mínimo de 30 segundos`);
-      intervalMs = 30000;
+    // URL e segredo do webhook (preferência para os valores passados como parâmetro)
+    const hookUrl = webhookUrl || process.env.WEBHOOK_URL || '';
+    const hookSecret = webhookSecret || process.env.WEBHOOK_SECRET || '';
+    
+    if (!hookUrl) {
+      console.log('Nenhuma URL de webhook configurada para notificações');
     }
     
-    // Novo método para cálculo da próxima ocorrência
-    // Baseado no tempo decorrido desde o início
-    const timeSinceStart = Math.max(0, now.getTime() - startDate.getTime());
-    
-    // Calcular quantos intervalos completos se passaram desde o início
-    const intervalsElapsed = Math.floor(timeSinceStart / intervalMs);
-    
-    // A próxima ocorrência é o início + (n+1) intervalos
-    const nextOccurrenceTime = startDate.getTime() + ((intervalsElapsed + 1) * intervalMs);
-    
-    console.log(`Tempo desde o início: ${timeSinceStart}ms (${timeSinceStart / 1000} segundos)`);
-    console.log(`Intervalos completos decorridos: ${intervalsElapsed}`);
-    console.log(`Próximo horário calculado: ${new Date(nextOccurrenceTime).toISOString()}`);
-    
-    // Verificar se a próxima ocorrência já passou (pode acontecer devido a atrasos)
-    if (nextOccurrenceTime <= now.getTime()) {
-      // Se já passou, agendar para daqui a um intervalo completo
-      nextNotificationTime = new Date(now.getTime() + intervalMs);
-      console.log(`Próxima ocorrência já passou, agendando para um intervalo a partir de agora: ${nextNotificationTime.toISOString()}`);
-    } else {
-      // Caso contrário, usar o valor calculado
-      nextNotificationTime = new Date(nextOccurrenceTime);
-      console.log(`Próxima ocorrência no futuro, agendando para: ${nextNotificationTime.toISOString()}`);
-    }
-  }
-  
-  // Verificar se a data final já passou
-  if (product.endDateTime) {
-    const endDate = new Date(product.endDateTime);
-    console.log(`Data de término: ${endDate.toISOString()}`);
-    
-    if (nextNotificationTime > endDate) {
-      console.log(`Tratamento já finalizado para medicamento ${product.title}. Ignorando agendamento.`);
+    // Verificar se o lembrete é válido
+    if (!reminder || !reminder.medicationProducts || !Array.isArray(reminder.medicationProducts)) {
+      console.error('Lembrete inválido para agendamento:', reminder);
       return;
     }
+    
+    // ID do lembrete seguro (garantindo string para uso em comparações)
+    const reminderId = reminder._id ? 
+      (reminder._id instanceof Types.ObjectId ? reminder._id.toString() : String(reminder._id)) : 
+      '';
+    
+    if (!reminderId) {
+      console.error('Lembrete sem ID não pode ser agendado');
+      return;
+    }
+    
+    // Primeiro, remover qualquer tarefa existente para este lembrete para evitar duplicação
+    console.log(`Removendo tarefas existentes para o lembrete ${reminderId}`);
+    removeTasksForReminder(reminderId);
+    
+    // Adicionar novas tarefas para cada medicamento
+    const now = new Date();
+    
+    // Contadores para log
+    let addedTasks = 0;
+    let skipppedTasks = 0;
+    
+    // Para cada medicamento no lembrete
+    await Promise.all(reminder.medicationProducts.map(async (product: any, index: number) => {
+      try {
+        // Validar dados do produto
+        if (!product.startDateTime) {
+          console.error(`Medicamento ${index} sem data de início, pulando agendamento`);
+          skipppedTasks++;
+          return;
+        }
+        
+        console.log(`Agendando notificações para o medicamento "${product.title}" (índice ${index})`);
+        
+        // Converter para objeto Date
+        const startDateTime = new Date(product.startDateTime);
+        
+        // Se a data de início já passou, recalcular a próxima dose
+        if (startDateTime < now) {
+          console.log(`Data inicial ${startDateTime.toISOString()} já passou, calculando próxima dose`);
+          
+          // Obter dados de frequência do medicamento
+          const frequencyValue = product.frequencyValue || 8;
+          const frequencyUnit = validateFrequencyUnit(product.frequencyUnit);
+          
+          // Verificar se temos data de término
+          const endDateTime = product.endDateTime ? new Date(product.endDateTime) : null;
+          
+          // Se já passou da data de término, não agendar
+          if (endDateTime && now > endDateTime) {
+            console.log(`Medicamento ${index} já ultrapassou a data de término (${endDateTime.toISOString()}), não será agendado`);
+            skipppedTasks++;
+            return;
+          }
+          
+          // Calcular tempo decorrido desde o início em milissegundos
+          const elapsedMs = now.getTime() - startDateTime.getTime();
+          
+          // Converter frequência para milissegundos
+          let frequencyMs = 0;
+          switch (frequencyUnit) {
+            case 'minutos':
+              frequencyMs = frequencyValue * 60 * 1000;
+              break;
+            case 'horas':
+              frequencyMs = frequencyValue * 60 * 60 * 1000;
+              break;
+            case 'dias':
+              frequencyMs = frequencyValue * 24 * 60 * 60 * 1000;
+              break;
+          }
+          
+          // Calcular quantas doses já deveriam ter sido tomadas
+          const dosesElapsed = Math.floor(elapsedMs / frequencyMs);
+          
+          // Calcular quando seria a próxima dose
+          const nextDoseTime = new Date(startDateTime.getTime() + (dosesElapsed + 1) * frequencyMs);
+          
+          console.log(`Próxima dose calculada para ${nextDoseTime.toISOString()}`);
+          
+          // Agendar a próxima dose
+          if (!endDateTime || nextDoseTime <= endDateTime) {
+            console.log(`Agendando notificação para ${nextDoseTime.toISOString()}`);
+            
+            const taskId = `reminder_${reminderId}_med_${index}_dose_${dosesElapsed + 1}`;
+            
+            // Adicionar à lista de tarefas
+            scheduledTasks.push({
+              id: taskId,
+              reminderId: reminderId,
+              medicationIndex: index,
+              scheduledTime: nextDoseTime,
+              webhookUrl: hookUrl,
+              webhookSecret: hookSecret
+            });
+            
+            addedTasks++;
+          } else {
+            console.log(`Próxima dose calculada (${nextDoseTime.toISOString()}) está depois da data de término, pulando`);
+            skipppedTasks++;
+          }
+        } else {
+          // A data de início ainda não chegou, agendar normalmente
+          console.log(`Agendando notificação para a data inicial ${startDateTime.toISOString()}`);
+          
+          const taskId = `reminder_${reminderId}_med_${index}_dose_1`;
+          
+          // Adicionar à lista de tarefas
+          scheduledTasks.push({
+            id: taskId,
+            reminderId: reminderId,
+            medicationIndex: index,
+            scheduledTime: startDateTime,
+            webhookUrl: hookUrl,
+            webhookSecret: hookSecret
+          });
+          
+          addedTasks++;
+        }
+      } catch (productError) {
+        console.error(`Erro ao agendar notificações para o medicamento ${index}:`, productError);
+      }
+    }));
+    
+    console.log(`Agendamento completo para lembrete ${reminderId}: ${addedTasks} tarefas agendadas, ${skipppedTasks} puladas`);
+    
+    // Ordenar tarefas por data
+    scheduledTasks.sort((a, b) => a.scheduledTime.getTime() - b.scheduledTime.getTime());
+    
+    // Verificar tarefas imediatamente após agendar
+    checkScheduledTasks();
+  } catch (error) {
+    console.error('Erro ao agendar notificações:', error);
   }
-  
-  // Tempo até a próxima notificação, em milissegundos/segundos
-  const timeUntilNextMs = nextNotificationTime.getTime() - now.getTime();
-  const timeUntilNextSec = Math.round(timeUntilNextMs / 1000);
-  
-  console.log(`Próxima notificação em ${timeUntilNextSec} segundos (${timeUntilNextMs}ms)`);
-  
-  // Gerar ID único para a tarefa
-  const taskId = `${reminder.id || reminder._id}_${medicationIndex}_${Date.now()}`;
-  
-  // Adicionar à lista de tarefas agendadas
-  scheduledTasks.push({
-    id: taskId,
-    reminderId: reminder.id || reminder._id || '',
-    medicationIndex,
-    scheduledTime: nextNotificationTime,
-    webhookUrl: finalWebhookUrl,
-    webhookSecret: finalWebhookSecret
-  });
-  
-  console.log(`Tarefa ${taskId} agendada para ${nextNotificationTime.toISOString()} (medicamento ${product.title})`);
-  console.log(`Webhook será enviado para: ${finalWebhookUrl || 'URL não configurada'}`);
 }
 
 // Remover todas as notificações agendadas para um lembrete

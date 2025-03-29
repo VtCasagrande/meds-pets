@@ -46,18 +46,18 @@ if (uriMatch) {
 // Como já verificamos que MONGODB_URI não é undefined acima, podemos definir uma constante para TypeScript
 const MONGODB_URI_VERIFIED: string = MONGODB_URI;
 
-// Definir a interface para o cache
+// Interface para o cache de conexão
 interface MongooseCache {
   conn: mongoose.Connection | null;
   promise: Promise<mongoose.Connection> | null;
 }
 
-// Adicionar tipagem para o objeto global
+// Cache global para manter a conexão entre reloads
 declare global {
   var mongoose: MongooseCache | undefined;
 }
 
-// Garantir que cached não seja undefined
+// Inicializar o cache
 let cached: MongooseCache = global.mongoose || { conn: null, promise: null };
 
 if (!global.mongoose) {
@@ -65,31 +65,37 @@ if (!global.mongoose) {
   console.log('Cache global do mongoose inicializado');
 }
 
-async function dbConnect() {
+/**
+ * Função para conectar ao MongoDB
+ * Implementa padrão singleton para reutilizar conexões
+ */
+async function dbConnect(): Promise<mongoose.Connection> {
   console.log('dbConnect chamado - verificando conexão existente...');
   
-  // Se já temos uma conexão, retorná-la
+  // Se já tem uma conexão, retorna
   if (cached.conn) {
     console.log('Usando conexão existente com MongoDB');
     return cached.conn;
   }
 
-  // Se ainda não temos uma promessa de conexão, criá-la
+  // Se não tem promessa de conexão, cria uma nova
   if (!cached.promise) {
     const opts = {
-      // Remover a opção bufferCommands que está causando erros
-      // bufferCommands: false,
-      // Adicionar retry e timeout
-      serverSelectionTimeoutMS: 30000, // Aumentado para 30s
-      socketTimeoutMS: 60000, // 60s
-      connectTimeoutMS: 30000, // Aumentado para 30s
-      // Aumentar retries
+      // Configurações de timeout
+      serverSelectionTimeoutMS: 30000,
+      socketTimeoutMS: 60000,
+      connectTimeoutMS: 30000,
+      
+      // Configurações de pool de conexões
       maxPoolSize: 10,
       minPoolSize: 5,
+      
+      // Configurações de retry
       retryWrites: true,
       retryReads: true,
-      // Opções de autenticação
-      authSource: 'admin', // Banco de dados para autenticação (pode precisar ser ajustado)
+      
+      // Autenticação
+      authSource: 'admin'
     };
 
     console.log('Iniciando nova conexão ao MongoDB...');
