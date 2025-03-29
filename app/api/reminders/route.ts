@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/app/lib/db';
-import Reminder from '@/app/lib/models/Reminder';
+import Reminder, { IReminder } from '@/app/lib/models/Reminder';
 import { WebhookPayload } from '@/app/lib/types';
 import { Types } from 'mongoose';
-import { getCurrentUserId, getCurrentUserRole, requireAuth, authOptions } from '@/app/lib/auth';
+import { getCurrentUserId, getCurrentUserRole, requireAuth } from '@/app/lib/auth';
 import { logActivity } from '@/app/lib/services/auditLogService';
 import { getServerSession } from 'next-auth';
 import { logReminderCreation } from '@/app/lib/logHelpers';
-import { Reminder as ReminderType } from '@/app/lib/types';
 
 // Importar funções do schedulerService apenas em ambiente Node.js
 let scheduleReminderNotifications: (reminder: any, webhookUrl?: string, webhookSecret?: string) => Promise<void> = 
@@ -144,7 +143,7 @@ export async function GET(request: NextRequest) {
     const userId = await getCurrentUserId();
     const userRole = await getCurrentUserRole();
     
-    // Definir filtros com base no papel do usuário
+    // Preparar filtros para lembretes ativos e não ativos
     let activeFilter: any = { isActive: true };
     let completedFilter: any = { isActive: false };
     
@@ -207,7 +206,7 @@ export async function POST(request: NextRequest) {
     
     // Obter ID do usuário atual para armazenar como criador
     const userId = await getCurrentUserId();
-    const userEmail = (await getServerSession(authOptions))?.user?.email || '';
+    const userEmail = (await getServerSession())?.user?.email || '';
     
     // Extrair a URL e chave secreta do webhook, se fornecidas
     // Ou usar as configurações de ambiente como fallback
@@ -223,165 +222,115 @@ export async function POST(request: NextRequest) {
       );
     }
     
+    // Conectar ao MongoDB
+    console.log('Conectando ao banco de dados...');
+    await dbConnect();
+    console.log('Conexão estabelecida com sucesso');
+    
+    // Verificar formato da data nos medicamentos
     try {
-      // Conectar ao MongoDB
-      console.log('Conectando ao banco de dados...');
-      await dbConnect();
-      console.log('Conexão estabelecida com sucesso');
+      body.medicationProducts = body.medicationProducts.map((product: { startDateTime: string | Date, endDateTime?: string | Date }) => ({
+        ...product,
+        startDateTime: new Date(product.startDateTime),
+        ...(product.endDateTime && { endDateTime: new Date(product.endDateTime) })
+      }));
+      console.log('Datas dos medicamentos convertidas com sucesso');
+    } catch (dateError) {
+      console.error('Erro ao converter datas dos medicamentos:', dateError);
+      return NextResponse.json(
+        { error: 'Formato de data inválido nos medicamentos' },
+        { status: 400 }
+      );
+    }
+    
+    // Criar novo lembrete
+    console.log('Criando novo lembrete...');
+    try {
+      // Remover campos do webhook dos dados do lembrete
+      const reminderData = { ...body };
+      delete reminderData.webhookUrl;
+      delete reminderData.webhookSecret;
       
-      // Verificar formato da data nos medicamentos
-      try {
-        body.medicationProducts = body.medicationProducts.map((product: { startDateTime: string | Date, endDateTime?: string | Date }) => ({
-          ...product,
-          startDateTime: new Date(product.startDateTime),
-          ...(product.endDateTime && { endDateTime: new Date(product.endDateTime) })
-        }));
-        console.log('Datas dos medicamentos convertidas com sucesso');
-      } catch (dateError) {
-        console.error('Erro ao converter datas dos medicamentos:', dateError);
-        return NextResponse.json(
-          { error: 'Formato de data inválido nos medicamentos' },
-          { status: 400 }
-        );
+      // Adicionar o ID do usuário como criador do lembrete
+      if (userId) {
+        reminderData.createdBy = userId;
       }
       
-      // Criar novo lembrete
-      console.log('Criando novo lembrete...');
-      try {
-        // Remover campos do webhook dos dados do lembrete
-        const reminderData = { ...body };
-        delete reminderData.webhookUrl;
-        delete reminderData.webhookSecret;
+      const reminder = new Reminder(reminderData);
+      await reminder.save();
+      console.log('Lembrete criado com sucesso, ID:', reminder._id);
+      
+      // Registrar log de auditoria para criação de lembrete
+      await logReminderCreation(
+        reminder as IReminder, 
+        userId as string, 
+        userEmail as string, 
+        request
+      );
+      
+      // Enviar webhook para o primeiro medicamento (criação de lembrete)
+      if (reminder.medicationProducts.length > 0) {
+        const firstProduct = reminder.medicationProducts[0];
         
-        // Adicionar o ID do usuário como criador do lembrete
-        if (userId) {
-          reminderData.createdBy = userId;
-        }
-        
-        const reminder = new Reminder(reminderData);
-        await reminder.save();
-        console.log('Lembrete criado com sucesso, ID:', reminder._id);
-        
-        // Registrar log de auditoria para criação de lembrete
-        try {
-          await logReminderCreation(
-            reminder as unknown as ReminderType, 
-            userId as string, 
-            userEmail as string, 
-            request
-          );
-        } catch (logError) {
-          console.error('Erro ao registrar log de auditoria (não crítico):', logError);
-        }
-        
-        // Enviar webhook para o primeiro medicamento (criação de lembrete)
-        try {
-          if (reminder.medicationProducts.length > 0) {
-            const firstProduct = reminder.medicationProducts[0];
-            
-            // Preparar payload do webhook
-            const webhookPayload: WebhookPayload = {
-              reminderId: reminder._id ? (reminder._id instanceof Types.ObjectId ? reminder._id.toString() : String(reminder._id)) : '',
-              tutorName: reminder.tutorName,
-              petName: reminder.petName,
-              petBreed: reminder.petBreed || '',
-              phoneNumber: reminder.phoneNumber,
-              eventType: 'reminder_created',
-              eventDescription: 'Novo lembrete criado',
-              medicationProduct: {
-                title: firstProduct.title,
-                quantity: firstProduct.quantity,
-                frequencyValue: firstProduct.frequencyValue || 0,
-                frequencyUnit: (firstProduct.frequencyUnit as 'minutos' | 'horas' | 'dias') || 'horas',
-                duration: firstProduct.duration || 0,
-                durationUnit: (firstProduct.durationUnit as 'dias' | 'semanas' | 'meses') || 'dias',
-                startDateTime: firstProduct.startDateTime ? firstProduct.startDateTime.toISOString() : '',
-                endDateTime: firstProduct.endDateTime ? firstProduct.endDateTime.toISOString() : ''
-              }
-            };
-            
-            // Enviar webhook de criação
-            await sendWebhook(webhookPayload, webhookUrl, webhookSecret).catch(e => {
-              console.error('Erro ao enviar webhook (não crítico):', e);
-            });
+        // Preparar payload do webhook
+        const webhookPayload: WebhookPayload = {
+          reminderId: reminder._id ? (reminder._id instanceof Types.ObjectId ? reminder._id.toString() : String(reminder._id)) : '',
+          tutorName: reminder.tutorName,
+          petName: reminder.petName,
+          petBreed: reminder.petBreed || '',
+          phoneNumber: reminder.phoneNumber,
+          eventType: 'reminder_created',
+          eventDescription: 'Novo lembrete criado',
+          medicationProduct: {
+            title: firstProduct.title,
+            quantity: firstProduct.quantity,
+            frequencyValue: firstProduct.frequencyValue || 0,
+            frequencyUnit: (firstProduct.frequencyUnit as 'minutos' | 'horas' | 'dias') || 'horas',
+            duration: firstProduct.duration || 0,
+            durationUnit: (firstProduct.durationUnit as 'dias' | 'semanas' | 'meses') || 'dias',
+            startDateTime: firstProduct.startDateTime ? firstProduct.startDateTime.toISOString() : '',
+            endDateTime: firstProduct.endDateTime ? firstProduct.endDateTime.toISOString() : ''
           }
-        } catch (webhookError) {
-          console.error('Erro ao processar webhook (não crítico):', webhookError);
-        }
+        };
         
-        // Agendar notificações automáticas para cada medicamento
-        try {
-          console.log('Agendando notificações automáticas...');
-          await scheduleReminderNotifications(reminder, webhookUrl, webhookSecret);
-        } catch (scheduleError) {
-          console.error('Erro ao agendar notificações (não crítico):', scheduleError);
-        }
-        
-        // Retornar o lembrete criado com sucesso
-        return NextResponse.json(reminder, { status: 201 });
-      } catch (dbError: any) {
-        console.error('Erro ao salvar no banco de dados:', dbError);
-        
-        // Registrar log de erro
-        await logActivity({
-          action: 'create',
-          entity: 'reminder',
-          description: 'Erro ao criar lembrete',
-          details: { error: dbError.message || 'Erro desconhecido' },
-          request,
-          performedBy: userId || undefined,
-          performedByEmail: userEmail
-        });
-        
-        // Verificar erros de validação
-        if (dbError.name === 'ValidationError') {
-          const validationErrors = Object.keys(dbError.errors).reduce((acc: any, key) => {
-            acc[key] = dbError.errors[key].message;
-            return acc;
-          }, {});
-          
-          return NextResponse.json(
-            { error: 'Erro de validação', details: validationErrors },
-            { status: 400 }
-          );
-        }
-        
-        return NextResponse.json(
-          { error: 'Erro ao salvar no banco de dados', message: dbError.message },
-          { status: 500 }
-        );
-      }
-    } catch (error) {
-      console.error('Erro ao processar criação de lembrete:', error);
-      if (error instanceof Error) {
-        console.error('Detalhes do erro:', error.message);
-        console.error('Stack trace:', error.stack);
+        // Enviar webhook de criação
+        await sendWebhook(webhookPayload, webhookUrl, webhookSecret);
       }
       
-      // Obter dados do usuário para o log
-      let userId = 'sistema';
-      let userEmail = 'sistema@sistema.com';
+      // Agendar notificações automáticas para cada medicamento
+      console.log('Agendando notificações automáticas...');
+      await scheduleReminderNotifications(reminder, webhookUrl, webhookSecret);
       
-      try {
-        userId = await getCurrentUserId() || 'sistema';
-        userEmail = (await getServerSession(authOptions))?.user?.email || 'sistema@sistema.com';
-      } catch (e) {
-        console.error('Erro ao obter dados do usuário para log:', e);
-      }
+      return NextResponse.json(reminder, { status: 201 });
+    } catch (dbError: any) {
+      console.error('Erro ao salvar no banco de dados:', dbError);
       
       // Registrar log de erro
       await logActivity({
         action: 'create',
         entity: 'reminder',
-        description: 'Erro ao processar criação de lembrete',
-        details: { error: error instanceof Error ? error.message : 'Erro desconhecido' },
+        description: 'Erro ao criar lembrete',
+        details: { error: dbError.message || 'Erro desconhecido' },
         request,
         performedBy: userId || undefined,
         performedByEmail: userEmail
       });
       
+      // Verificar erros de validação
+      if (dbError.name === 'ValidationError') {
+        const validationErrors = Object.keys(dbError.errors).reduce((acc: any, key) => {
+          acc[key] = dbError.errors[key].message;
+          return acc;
+        }, {});
+        
+        return NextResponse.json(
+          { error: 'Erro de validação', details: validationErrors },
+          { status: 400 }
+        );
+      }
+      
       return NextResponse.json(
-        { error: 'Erro ao criar lembrete' },
+        { error: 'Erro ao salvar no banco de dados', message: dbError.message },
         { status: 500 }
       );
     }
@@ -392,26 +341,13 @@ export async function POST(request: NextRequest) {
       console.error('Stack trace:', error.stack);
     }
     
-    // Obter dados do usuário para o log
-    let userId = 'sistema';
-    let userEmail = 'sistema@sistema.com';
-    
-    try {
-      userId = await getCurrentUserId() || 'sistema';
-      userEmail = (await getServerSession(authOptions))?.user?.email || 'sistema@sistema.com';
-    } catch (e) {
-      console.error('Erro ao obter dados do usuário para log:', e);
-    }
-    
     // Registrar log de erro
     await logActivity({
       action: 'create',
       entity: 'reminder',
       description: 'Erro ao processar criação de lembrete',
       details: { error: error instanceof Error ? error.message : 'Erro desconhecido' },
-      request,
-      performedBy: userId || undefined,
-      performedByEmail: userEmail
+      request
     });
     
     return NextResponse.json(

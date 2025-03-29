@@ -2,7 +2,10 @@
 export type MedicationProduct = {
   id?: string;
   title: string;
+  description?: string; // Instruções ou notas adicionais
   quantity: string;
+  dosage?: string; // Valor da dosagem
+  dosageUnit?: string; // Unidade da dosagem (mg, g, ml, etc)
   frequency: string; // Campo legado
   // Novos campos para estruturar melhor a frequência
   frequencyValue: number;
@@ -60,7 +63,7 @@ export type WebhookPayload = {
 }
 
 // Tipos para usuários e autenticação
-export type UserRole = 'admin' | 'user' | 'creator';
+export type UserRole = 'admin' | 'user';
 
 export type User = {
   id?: string;

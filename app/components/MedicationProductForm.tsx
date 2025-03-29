@@ -157,11 +157,14 @@ export default function MedicationProductForm({
     description: "",
     quantity: "",
     frequencyValue: 1,
-    frequencyUnit: "day",
+    frequencyUnit: "dias",
     startDateTime: "",
     endDateTime: "",
     dosage: "",
     dosageUnit: "mg",
+    frequency: "",
+    duration: 7,
+    durationUnit: "dias"
   });
 
   useEffect(() => {
@@ -284,10 +287,9 @@ export default function MedicationProductForm({
                 onChange={handleInputChange}
                 className="input-field rounded-l-none flex-1 border-l-0"
               >
-                <option value="hour">Hora(s)</option>
-                <option value="day">Dia(s)</option>
-                <option value="week">Semana(s)</option>
-                <option value="month">Mês(es)</option>
+                <option value="horas">Hora(s)</option>
+                <option value="dias">Dia(s)</option>
+                <option value="minutos">Minuto(s)</option>
               </select>
             </div>
           </div>

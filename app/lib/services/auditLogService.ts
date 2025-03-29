@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server';
-import dbConnect from '../db';
+import dbConnect from '@/app/lib/db';
 import AuditLog, { IAuditLog } from '../models/AuditLog';
 import { getCurrentUserId } from '../auth';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/lib/auth';
 import { headers } from 'next/headers';
 
 interface LogOptions {
@@ -38,7 +37,16 @@ interface LogActivityParams {
  */
 export async function logActivity(params: LogActivityParams) {
   try {
+    // Conectar ao banco de dados
     await dbConnect();
+    const mongoose = await import('mongoose');
+    const db = mongoose.connection.db;
+    
+    if (!db) {
+      throw new Error('Não foi possível obter a conexão com o banco de dados');
+    }
+    
+    const collection = db.collection('auditLogs');
     
     let session;
     let headersList;
@@ -47,10 +55,10 @@ export async function logActivity(params: LogActivityParams) {
     if (!params.performedBy || !params.performedByEmail) {
       if (params.request) {
         // Se temos o objeto de requisição, podemos obter a sessão dele
-        session = await getServerSession(authOptions);
+        session = await getServerSession();
       } else {
         // Caso contrário, tentar obter a sessão normalmente
-        session = await getServerSession(authOptions);
+        session = await getServerSession();
       }
     }
     
@@ -93,8 +101,8 @@ export async function logActivity(params: LogActivityParams) {
       createdAt: new Date()
     };
     
-    // Inserir no banco de dados usando o modelo AuditLog
-    await AuditLog.create(logEntry);
+    // Inserir no banco de dados
+    await collection.insertOne(logEntry);
     
     return { success: true };
   } catch (error) {
@@ -148,13 +156,12 @@ export async function getAuditLogs({
   const skip = (page - 1) * limit;
 
   // Ordenação
-  const sortValue = sortDirection === 'asc' ? 1 : -1;
-  const sortOptions = { createdAt: sortValue };
+  const sort = { createdAt: sortDirection === 'asc' ? 1 : -1 } as { [key: string]: 1 | -1 };
 
   // Executar consulta
   const total = await AuditLog.countDocuments(filter);
   const logs = await AuditLog.find(filter)
-    .sort(sortOptions as any)
+    .sort(sort)
     .skip(skip)
     .limit(limit);
 

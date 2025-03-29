@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { logActivity } from './services/auditLogService';
-import { Reminder } from './types';
+import { IReminder } from './models/Reminder';
 
 /**
  * Registra um log de auditoria para ações de login
@@ -50,7 +50,7 @@ export async function logRegister(userId: string, email: string, request?: NextR
 /**
  * Registra um log de auditoria para ações de criação de lembrete
  */
-export async function logReminderCreation(reminder: Reminder, userId: string, email: string, request?: NextRequest) {
+export async function logReminderCreation(reminder: IReminder, userId: string, email: string, request?: NextRequest) {
   const reminderId = reminder.id || reminder._id;
   await logActivity({
     action: 'create',
@@ -75,7 +75,7 @@ export async function logReminderCreation(reminder: Reminder, userId: string, em
  * Registra um log de auditoria para ações de atualização de lembrete
  */
 export async function logReminderUpdate(
-  reminder: Reminder, 
+  reminder: IReminder, 
   oldData: any, 
   userId: string, 
   email: string, 
@@ -108,7 +108,7 @@ export async function logReminderUpdate(
  * Registra um log de auditoria para ações de exclusão de lembrete
  */
 export async function logReminderDeletion(
-  reminder: Reminder, 
+  reminder: IReminder, 
   userId: string, 
   email: string, 
   request?: NextRequest
