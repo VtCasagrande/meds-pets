@@ -817,6 +817,9 @@ function removeTasksForReminder(reminderId: string): void {
   console.log(`Removidas ${removedCount} tarefas agendadas para o lembrete ${reminderId}`);
 }
 
+// Alias para removeTasksForReminder para manter compatibilidade com código existente
+export const removeReminderNotifications = removeTasksForReminder;
+
 // Listar todas as tarefas agendadas (para visualização no painel)
 export function listScheduledTasks() {
   if (!isNodeEnvironment) {
