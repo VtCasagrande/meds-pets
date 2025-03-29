@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import mongoose from 'mongoose';
 
+// Definir interface para os detalhes de erro
+interface ErrorDetails {
+  name: string;
+  message: string;
+  reason?: string;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const mongoURI = process.env.MONGODB_URI;
@@ -65,17 +72,14 @@ export async function GET(request: NextRequest) {
     });
   } catch (error: any) {
     // Analisar o erro
-    let errorDetails = {
+    let errorDetails: ErrorDetails = {
       name: error.name,
       message: error.message,
     };
     
     // Informações extras para tipos específicos de erro
     if (error.name === 'MongoServerSelectionError') {
-      errorDetails = {
-        ...errorDetails,
-        reason: error.reason?.toString() || 'Desconhecido',
-      };
+      errorDetails.reason = error.reason?.toString() || 'Desconhecido';
     }
     
     return NextResponse.json({
