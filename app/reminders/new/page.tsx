@@ -293,20 +293,15 @@ export default function NewReminderPage() {
               </div>
             )}
             
-            {/* Formulário de medicamentos ou botão para adicionar */}
-            {showProductForm ? (
-              <MedicationProductForm
-                onAdd={handleAddProduct}
-                onCancel={() => {
-                  setShowProductForm(false);
-                  setEditingProductIndex(null);
-                }}
-                initialData={editingProductIndex !== null ? reminder.medicationProducts[editingProductIndex] : undefined}
-              />
-            ) : (
+            {/* Botão para adicionar medicamento (fora do formulário de medicamento) */}
+            {!showProductForm && (
               <button
                 type="button"
-                onClick={() => setShowProductForm(true)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setShowProductForm(true);
+                }}
                 className="btn-secondary"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
@@ -400,6 +395,20 @@ export default function NewReminderPage() {
           </div>
         </form>
       </div>
+      
+      {/* Formulário de medicamentos em container separado para evitar conflitos */}
+      {showProductForm && (
+        <div className="mt-6">
+          <MedicationProductForm
+            onAdd={handleAddProduct}
+            onCancel={() => {
+              setShowProductForm(false);
+              setEditingProductIndex(null);
+            }}
+            initialData={editingProductIndex !== null ? reminder.medicationProducts[editingProductIndex] : undefined}
+          />
+        </div>
+      )}
     </div>
   );
 } 

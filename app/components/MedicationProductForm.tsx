@@ -1,7 +1,7 @@
 'use client';
 
-import { MedicationProduct } from '../lib/types';
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
+import { MedicationProduct } from "@/app/types/types";
 
 interface MedicationProductFormProps {
   onAdd: (product: MedicationProduct) => void;
@@ -150,303 +150,210 @@ function checkLastDose(startDate: string, endDate: string, frequencyValue: numbe
 export default function MedicationProductForm({
   onAdd,
   onCancel,
-  initialData
+  initialData,
 }: MedicationProductFormProps) {
-  const [product, setProduct] = useState<MedicationProduct>(
-    initialData || {
-      title: '',
-      quantity: '',
-      frequency: '', // Campo legado
-      frequencyValue: 8,
-      frequencyUnit: 'horas',
-      duration: 7,
-      durationUnit: 'dias',
-      startDateTime: new Date().toISOString().slice(0, 16),
-      endDateTime: ''
-    }
-  );
-  
-  // Contador para forçar atualizações quando necessário
-  const [forceUpdate, setForceUpdate] = useState(0);
-  
-  // Estado para armazenar informações sobre a última dose
-  const [lastDoseInfo, setLastDoseInfo] = useState<{
-    isLastDoseIncomplete: boolean;
-    message: string;
-    lastDoseTime?: Date;
-  }>({
-    isLastDoseIncomplete: false,
-    message: ''
+  const [product, setProduct] = useState<MedicationProduct>({
+    title: "",
+    description: "",
+    quantity: "",
+    frequencyValue: 1,
+    frequencyUnit: "day",
+    startDateTime: "",
+    endDateTime: "",
+    dosage: "",
+    dosageUnit: "mg",
   });
-  
-  // Função para forçar recálculo da data final
-  const forceRecalculation = () => {
-    console.log('Forçando recálculo da data final...');
-    setForceUpdate(prev => prev + 1);
-  };
 
-  // Calcular data de término quando a data de início, duração ou frequência mudar
   useEffect(() => {
-    if (product.startDateTime && product.duration && product.durationUnit) {
-      console.log('Recalculando data de término devido a mudanças em:', {
-        startDateTime: product.startDateTime,
-        duration: product.duration,
-        durationUnit: product.durationUnit,
-        frequencyValue: product.frequencyValue,
-        frequencyUnit: product.frequencyUnit,
-        forceUpdate
-      });
-      
-      // Forçar recálculo ao alterar duração e frequência
-      // Isso resolve o problema de estado do React que pode não detectar mudanças profundas
-      const endDate = calculateEndDate(
-        product.startDateTime, 
-        product.duration, 
-        product.durationUnit,
-        product.frequencyValue,
-        product.frequencyUnit
-      );
-      
-      console.log('Nova data de término calculada:', endDate);
-      setProduct(prev => {
-        const updated = { ...prev, endDateTime: endDate };
-        console.log('Novo estado do produto:', updated);
-        return updated;
-      });
+    if (initialData) {
+      setProduct(initialData);
     }
-  }, [product.startDateTime, product.duration, product.durationUnit, forceUpdate]);
+  }, [initialData]);
 
-  // Atualizar o campo de frequência legado quando os novos campos mudarem
-  useEffect(() => {
-    const legacyFrequency = `A cada ${product.frequencyValue} ${product.frequencyUnit}`;
-    setProduct(prev => ({ ...prev, frequency: legacyFrequency }));
-  }, [product.frequencyValue, product.frequencyUnit]);
-  
-  // Verificar se a última dose ficará incompleta
-  useEffect(() => {
-    if (product.startDateTime && product.endDateTime && product.frequencyValue && product.frequencyUnit) {
-      console.log('Verificando última dose para:', {
-        start: product.startDateTime,
-        end: product.endDateTime,
-        frequencyValue: product.frequencyValue,
-        frequencyUnit: product.frequencyUnit
-      });
-      
-      const info = checkLastDose(
-        product.startDateTime,
-        product.endDateTime,
-        product.frequencyValue,
-        product.frequencyUnit
-      );
-      
-      console.log('Resultado da verificação da última dose:', info);
-      setLastDoseInfo(info);
-    }
-  }, [product.startDateTime, product.endDateTime, product.frequencyValue, product.frequencyUnit]);
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
     const { name, value } = e.target;
-    
-    // Tratamento especial para campos numéricos
-    if (name === 'frequencyValue' || name === 'duration') {
-      const numValue = parseInt(value);
-      setProduct({ ...product, [name]: isNaN(numValue) ? 0 : numValue });
-      // Força recálculo após alterar valores importantes
-      setTimeout(forceRecalculation, 100);
-    } else {
-      setProduct({ ...product, [name]: value });
-      
-      // Para os campos que afetam o cálculo das datas, forçar recálculo
-      if (['frequencyUnit', 'durationUnit', 'startDateTime'].includes(name)) {
-        setTimeout(forceRecalculation, 100);
-      }
-    }
+    setProduct((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
   };
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault(); // Impedir o comportamento padrão de submissão do formulário
-    e.stopPropagation(); // Impedir que o evento propague para formulários pai
+    // Impede o comportamento padrão do formulário (recarregar a página)
+    e.preventDefault();
     
-    // Validar campos obrigatórios
+    // Impede a propagação do evento para formulários pais
+    e.stopPropagation();
+    
+    // Validação de campos obrigatórios
     if (!product.title || !product.quantity || !product.frequencyValue || !product.startDateTime) {
-      alert('Por favor, preencha todos os campos obrigatórios');
+      alert("Por favor, preencha todos os campos obrigatórios.");
       return;
     }
     
-    // Enviar para componente pai
     onAdd(product);
   };
 
   return (
-    <div className="card">
-      <h3 className="font-semibold text-xl mb-6">
-        {initialData ? 'Editar Medicamento' : 'Adicionar Novo Medicamento'}
-      </h3>
+    <div className="border border-primary-light rounded-lg p-6 bg-white shadow-sm" onClick={(e) => e.stopPropagation()}>
+      <h3 className="text-lg font-medium mb-4">Adicionar Medicamento</h3>
       
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Nome do Medicamento */}
-          <div className="col-span-2">
-            <label className="block text-dark-dark text-sm font-medium mb-2" htmlFor="title">
-              Nome do Medicamento
+      <form onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label htmlFor="title" className="block text-dark-dark text-sm font-medium mb-2">
+              Nome do Medicamento *
             </label>
             <input
               type="text"
               id="title"
               name="title"
-              value={product.title}
-              onChange={handleChange}
-              className="input-field"
-              placeholder="Ex: Amoxicilina, Vermífugo, etc."
               required
+              value={product.title}
+              onChange={handleInputChange}
+              className="input-field"
+              placeholder="Nome do medicamento"
             />
           </div>
           
-          {/* Quantidade/Dosagem */}
-          <div className="col-span-2 md:col-span-1">
-            <label className="block text-dark-dark text-sm font-medium mb-2" htmlFor="quantity">
-              Dosagem
+          <div>
+            <label htmlFor="quantity" className="block text-dark-dark text-sm font-medium mb-2">
+              Quantidade *
             </label>
             <input
               type="text"
               id="quantity"
               name="quantity"
-              value={product.quantity}
-              onChange={handleChange}
-              className="input-field"
-              placeholder="Ex: 1 comprimido, 5ml, etc."
               required
+              value={product.quantity}
+              onChange={handleInputChange}
+              className="input-field"
+              placeholder="Ex: 1 comprimido, 10ml"
             />
           </div>
           
-          {/* Frequência - Novo formato com dois campos */}
-          <div className="col-span-2 md:col-span-1">
-            <label className="block text-dark-dark text-sm font-medium mb-2">
-              Frequência
+          <div>
+            <label htmlFor="dosage" className="block text-dark-dark text-sm font-medium mb-2">
+              Dosagem
             </label>
-            <div className="flex space-x-2">
-              <div className="flex-1">
-                <input
-                  type="number"
-                  name="frequencyValue"
-                  value={product.frequencyValue}
-                  onChange={handleChange}
-                  className="input-field"
-                  min="1"
-                  required
-                />
-              </div>
-              <div className="w-1/2">
-                <select
-                  name="frequencyUnit"
-                  value={product.frequencyUnit}
-                  onChange={handleChange}
-                  className="input-field"
-                  required
-                >
-                  <option value="horas">horas</option>
-                  <option value="dias">dias</option>
-                  <option value="minutos">minutos</option>
-                </select>
-              </div>
+            <div className="flex">
+              <input
+                type="text"
+                id="dosage"
+                name="dosage"
+                value={product.dosage}
+                onChange={handleInputChange}
+                className="input-field rounded-r-none flex-1"
+                placeholder="Ex: 500"
+              />
+              <select
+                name="dosageUnit"
+                value={product.dosageUnit}
+                onChange={handleInputChange}
+                className="input-field rounded-l-none w-20 border-l-0"
+              >
+                <option value="mg">mg</option>
+                <option value="g">g</option>
+                <option value="ml">ml</option>
+                <option value="mcg">mcg</option>
+                <option value="UI">UI</option>
+              </select>
             </div>
-            <p className="text-xs text-dark-light mt-1">
-              Ex: A cada 8 horas, a cada 12 horas, etc.
-            </p>
           </div>
           
-          {/* Data e hora de início */}
           <div>
-            <label className="block text-dark-dark text-sm font-medium mb-2" htmlFor="startDateTime">
-              Data e Hora de Início
+            <label htmlFor="frequencyValue" className="block text-dark-dark text-sm font-medium mb-2">
+              Frequência *
+            </label>
+            <div className="flex">
+              <input
+                type="number"
+                id="frequencyValue"
+                name="frequencyValue"
+                required
+                min="1"
+                value={product.frequencyValue}
+                onChange={handleInputChange}
+                className="input-field rounded-r-none w-20"
+              />
+              <select
+                name="frequencyUnit"
+                value={product.frequencyUnit}
+                onChange={handleInputChange}
+                className="input-field rounded-l-none flex-1 border-l-0"
+              >
+                <option value="hour">Hora(s)</option>
+                <option value="day">Dia(s)</option>
+                <option value="week">Semana(s)</option>
+                <option value="month">Mês(es)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div>
+            <label htmlFor="startDateTime" className="block text-dark-dark text-sm font-medium mb-2">
+              Data/Hora de Início *
             </label>
             <input
               type="datetime-local"
               id="startDateTime"
               name="startDateTime"
-              value={product.startDateTime}
-              onChange={handleChange}
-              className="input-field"
               required
+              value={product.startDateTime}
+              onChange={handleInputChange}
+              className="input-field"
             />
           </div>
           
-          {/* Duração - Novo formato com dois campos */}
           <div>
-            <label className="block text-dark-dark text-sm font-medium mb-2">
-              Duração do Tratamento
-            </label>
-            <div className="flex space-x-2">
-              <div className="flex-1">
-                <input
-                  type="number"
-                  name="duration"
-                  value={product.duration}
-                  onChange={handleChange}
-                  className="input-field"
-                  min="1"
-                  required
-                />
-              </div>
-              <div className="w-1/2">
-                <select
-                  name="durationUnit"
-                  value={product.durationUnit}
-                  onChange={handleChange}
-                  className="input-field"
-                  required
-                >
-                  <option value="dias">dias</option>
-                  <option value="semanas">semanas</option>
-                  <option value="meses">meses</option>
-                </select>
-              </div>
-            </div>
-          </div>
-          
-          {/* Data calculada de término */}
-          <div className="col-span-2">
-            <label className="block text-dark-dark text-sm font-medium mb-2" htmlFor="endDateTime">
-              Data e Hora de Término (calculada automaticamente)
+            <label htmlFor="endDateTime" className="block text-dark-dark text-sm font-medium mb-2">
+              Data/Hora de Fim
             </label>
             <input
               type="datetime-local"
               id="endDateTime"
               name="endDateTime"
               value={product.endDateTime}
-              className="input-field bg-neutral-dark/10 cursor-not-allowed"
-              disabled
+              onChange={handleInputChange}
+              className="input-field"
             />
-            {lastDoseInfo.message && (
-              <p className="text-xs text-accent-dark mt-1">{lastDoseInfo.message}</p>
-            )}
           </div>
         </div>
         
-        {/* Visualização de doses */}
-        {product.startDateTime && product.endDateTime && (
-          <div className="bg-neutral/50 p-4 rounded-lg mt-6 border border-neutral-dark">
-            <h4 className="font-medium text-sm mb-2">Informações sobre as doses</h4>
-            <MedicationDoseSchedule product={product} />
-          </div>
-        )}
+        <div className="mb-6">
+          <label htmlFor="description" className="block text-dark-dark text-sm font-medium mb-2">
+            Instruções
+          </label>
+          <textarea
+            id="description"
+            name="description"
+            rows={3}
+            value={product.description}
+            onChange={handleInputChange}
+            className="input-field"
+            placeholder="Instruções adicionais para administração"
+          ></textarea>
+        </div>
         
-        {/* Botões de ação */}
-        <div className="flex justify-end space-x-3 pt-4 border-t border-neutral-dark mt-6">
-          <button 
-            type="button" 
-            onClick={onCancel}
+        <div className="flex justify-end space-x-3">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onCancel();
+            }}
             className="btn-outline"
           >
             Cancelar
           </button>
-          <button 
-            type="submit" 
+          <button
+            type="submit"
             className="btn-primary"
           >
-            {initialData ? 'Atualizar' : 'Adicionar'} Medicamento
+            {initialData ? 'Atualizar Medicamento' : 'Adicionar Medicamento'}
           </button>
         </div>
       </form>
