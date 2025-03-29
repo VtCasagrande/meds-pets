@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -35,7 +35,17 @@ interface LogsResponse {
   };
 }
 
-export default function AuditLogsPage() {
+// Componente de carregamento
+function LoadingState() {
+  return (
+    <div className="flex justify-center items-center min-h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+    </div>
+  );
+}
+
+// Componente principal envolvido por Suspense
+function AuditLogsContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -157,11 +167,7 @@ export default function AuditLogsPage() {
   
   // Exibir mensagem de carregamento
   if (status === 'loading' || isLoading) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-      </div>
-    );
+    return <LoadingState />;
   }
   
   // Traduzir ação e entidade para português
@@ -260,54 +266,57 @@ export default function AuditLogsPage() {
                 <option value="login">Login</option>
                 <option value="logout">Logout</option>
                 <option value="register">Registro</option>
-                <option value="other">Outro</option>
               </select>
             </div>
             
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">E-mail do Usuário</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email do Usuário</label>
               <input
                 type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="Filtrar por e-mail"
+                placeholder="Filtrar por email"
+                className="w-full border border-gray-300 rounded-md p-2"
+              />
+            </div>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Data Inicial</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
                 className="w-full border border-gray-300 rounded-md p-2"
               />
             </div>
             
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Período</label>
-              <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md p-2"
-                />
-                <span className="self-center">até</span>
-                <input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md p-2"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Data Final</label>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="w-full border border-gray-300 rounded-md p-2"
+              />
             </div>
           </div>
           
-          <div className="flex justify-end gap-2">
+          <div className="flex space-x-2">
+            <button
+              type="submit"
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Aplicar Filtros
+            </button>
+            
             <button
               type="button"
               onClick={clearFilters}
-              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300"
             >
               Limpar Filtros
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
-            >
-              Aplicar Filtros
             </button>
           </div>
         </form>
@@ -326,82 +335,163 @@ export default function AuditLogsPage() {
       </div>
       
       {/* Tabela de logs */}
-      <div className="bg-white rounded-lg shadow overflow-hidden mb-6">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Hora</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuário</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entidade</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {logs.length === 0 ? (
+      <div className="bg-white rounded-lg shadow overflow-hidden">
+        {error && (
+          <div className="p-4 bg-red-100 text-red-700 border-l-4 border-red-500 mb-4">
+            {error}
+          </div>
+        )}
+        
+        {logs.length === 0 ? (
+          <div className="p-6 text-center text-gray-500">
+            Nenhum log encontrado.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
-                    Nenhum log encontrado
-                  </td>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data/Hora</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ação</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entidade</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Usuário</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP</th>
                 </tr>
-              ) : (
-                logs.map((log) => (
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {logs.map((log) => (
                   <tr key={log._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDateTime(log.createdAt)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {log.performedByEmail || 'Sistema'}
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${getActionColor(log.action)}`}>
+                      <span className={`px-2 py-1 rounded-full text-xs ${getActionColor(log.action)}`}>
                         {translateAction(log.action)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {translateEntity(log.entity)}
                       {log.entityId && (
-                        <span className="text-xs text-gray-500 block">ID: {log.entityId.substring(0, 8)}...</span>
+                        <span className="text-xs text-gray-400 block">ID: {log.entityId}</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
+                    <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
                       {log.description}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {log.performedByEmail || 'Sistema'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {log.ipAddress || 'N/A'}
+                    </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      
-      {/* Paginação */}
-      {pagination.totalPages > 1 && (
-        <div className="flex justify-between items-center">
-          <div className="text-sm text-gray-700">
-            Página {pagination.page} de {pagination.totalPages}
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="flex gap-2">
-            {pagination.hasPrevPage && (
+        )}
+        
+        {/* Paginação */}
+        {pagination.totalPages > 1 && (
+          <div className="px-6 py-4 flex items-center justify-between border-t border-gray-200">
+            <div className="flex-1 flex justify-between sm:hidden">
               <button
                 onClick={() => goToPage(pagination.page - 1)}
-                className="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                disabled={!pagination.hasPrevPage}
+                className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                  pagination.hasPrevPage ? 'bg-white text-gray-700 hover:bg-gray-50' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
               >
                 Anterior
               </button>
-            )}
-            {pagination.hasNextPage && (
               <button
                 onClick={() => goToPage(pagination.page + 1)}
-                className="px-3 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                disabled={!pagination.hasNextPage}
+                className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+                  pagination.hasNextPage ? 'bg-white text-gray-700 hover:bg-gray-50' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                }`}
               >
                 Próxima
               </button>
-            )}
+            </div>
+            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Mostrando <span className="font-medium">{logs.length > 0 ? (pagination.page - 1) * pagination.limit + 1 : 0}</span> a <span className="font-medium">{(pagination.page - 1) * pagination.limit + logs.length}</span> de <span className="font-medium">{pagination.total}</span> resultados
+                </p>
+              </div>
+              <div>
+                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Paginação">
+                  <button
+                    onClick={() => goToPage(pagination.page - 1)}
+                    disabled={!pagination.hasPrevPage}
+                    className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
+                      pagination.hasPrevPage ? 'text-gray-500 hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed'
+                    }`}
+                  >
+                    <span className="sr-only">Anterior</span>
+                    <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  
+                  {/* Números de página */}
+                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
+                    // Calcular os números de página a exibir
+                    let pageNum;
+                    if (pagination.totalPages <= 5) {
+                      pageNum = i + 1;
+                    } else if (pagination.page <= 3) {
+                      pageNum = i + 1;
+                    } else if (pagination.page >= pagination.totalPages - 2) {
+                      pageNum = pagination.totalPages - 4 + i;
+                    } else {
+                      pageNum = pagination.page - 2 + i;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => goToPage(pageNum)}
+                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                          pagination.page === pageNum
+                            ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                            : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                  
+                  <button
+                    onClick={() => goToPage(pagination.page + 1)}
+                    disabled={!pagination.hasNextPage}
+                    className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
+                      pagination.hasNextPage ? 'text-gray-500 hover:bg-gray-50' : 'text-gray-300 cursor-not-allowed'
+                    }`}
+                  >
+                    <span className="sr-only">Próxima</span>
+                    <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </nav>
+              </div>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
+  );
+}
+
+// Componente principal
+export default function AuditLogsPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <AuditLogsContent />
+    </Suspense>
   );
 } 
